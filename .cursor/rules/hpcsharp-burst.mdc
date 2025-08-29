@@ -1,0 +1,78 @@
+---
+globs: *.cs
+alwaysApply: false
+---
+
+### HPC# and Burst Compiler Rule (Unity/C#)
+
+Maximize performance by constraining hot paths to HPC# and enabling Burst on strictly static entrypoints with unmanaged data only.
+
+#### Scope
+- Applies to any system entrypoint, job launcher, or compute-heavy path intended to be Burst-compiled.
+
+#### Entrypoints (MANDATORY)
+- Define entrypoints in static classes; entrypoint methods must be `static`.
+- Annotate entrypoints with `[BurstCompile]` (optionally tune `FloatMode`/`FloatPrecision`).
+- Accept only blittable/unmanaged arguments; prefer `in`/`ref` for large structs.
+- No captured closures/lambdas; if delegates are required, use static function pointers only.
+
+Example (excerpt):
+```csharp
+using Unity.Burst;
+using Unity.Collections;
+using Unity.Mathematics;
+
+public static class PositionUpdateSystemBurst
+{
+    [BurstCompile(FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Low)]
+    public static void UpdatePositions(NativeArray<float3> positions, float3 velocity, float deltaTime)
+    {
+        for (int i = 0; i < positions.Length; i++)
+        {
+            positions[i] += velocity * deltaTime;
+        }
+    }
+}
+```
+
+#### Data & Types in Burst Paths (HPC# Only)
+- Use structs only; do not use classes in Burst-executed code.
+- Avoid all managed types and APIs (`string`, `List<>`, `Dictionary<>`, LINQ, `UnityEngine.*`).
+- Prefer `Unity.Collections` containers (`NativeArray`, `NativeList`, `NativeHashMap`, etc.) and `Unity.Mathematics` types.
+- Ensure all contained types are blittable.
+
+#### Unity object references
+- If referencing Unity managed objects is unavoidable, store them as `Unity.Entities.UnityObjectRef<T>`.
+- Do not pass raw managed objects into Burst paths. Resolve references outside and pass blittable data in.
+
+Example (reference handle):
+```csharp
+using Unity.Entities;
+using UnityEngine;
+
+public struct MeshHandle
+{
+    public UnityObjectRef<Mesh> MeshRef;
+}
+```
+
+#### Forbidden in Burst Paths
+- Managed allocations or GC interactions
+- Exceptions/throwing, logging/Debug calls
+- Virtual/interface dispatch, reflection, `dynamic`
+- `GCHandle`, `UnsafeUtility` pinning of managed memory
+- Any `UnityEngine` API calls (e.g., `GetComponent`, rendering/texture/mesh mutations)
+
+#### Recommended attributes/settings
+- `[BurstCompile(FloatMode = FloatMode.Fast, FloatPrecision = FloatPrecision.Low)]` for math-heavy code.
+- Use `[ReadOnly]`, `[WriteOnly]`, `[NoAlias]` as appropriate on `Native*` data.
+
+#### PR/Review checklist
+- Entrypoint is a static method in a static class and has `[BurstCompile]`.
+- All parameters and data crossing the boundary are blittable (`Native*`, `struct`, `math` types).
+- No managed types, no `UnityEngine` API, no closures/delegates capturing managed state.
+- Unity object references (if any) are via `UnityObjectRef<T>` only.
+
+#### Exceptions
+- Thin, non-Burst wrappers may exist only to bridge managed/engine calls; keep them minimal and outside hot loops.
+

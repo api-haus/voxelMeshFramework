@@ -1,0 +1,25 @@
+{
+	"files.exclude": {
+		"!Library/": true,
+		"!Library/PackageCache": true,
+		"!Library/PackageCache/**/*.cs": true,
+		"!Library/PackageCache/com.unity.mathematics*": true,
+		"!Library/PackageCache/com.unity.entities*": true,
+		"!Library/PackageCache/com.unity.burst*": true,
+		"!Library/PackageCache/com.unity.collections*": true,
+		"!Library/PackageCache/com.unity.inputsystem*": true,
+		"!Library/PackageCache/com.unity.cinemachine*": true,
+		"!Library/PackageCache/com.unity.test-framework*": true
+	},
+	"search.exclude": {
+		"!Library/": true,
+		"!Library/PackageCache": true,
+		"!Library/PackageCache/com.unity.mathematics*": true,
+		"!Library/PackageCache/com.unity.entities*": true,
+		"!Library/PackageCache/com.unity.burst*": true,
+		"!Library/PackageCache/com.unity.collections*": true,
+		"!Library/PackageCache/com.unity.inputsystem*": true,
+		"!Library/PackageCache/com.unity.cinemachine*": true,
+		"!Library/PackageCache/com.unity.test-framework*": true
+	}
+}

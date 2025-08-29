@@ -1,0 +1,104 @@
+---
+globs: *.rs,*.cs
+alwaysApply: false
+---
+### Rule Name: code-comments
+
+### Description
+Guidelines for writing helpful code comments that aid understanding without cluttering the codebase.
+
+### Principles
+- **Aid understanding**: Comments exist to help developers understand the code, not to explain the conversation context
+- **Describe present state**: Comments must describe what the code does now, not history or future plans
+- **Be selective**: Only add comments where they provide value; most code should be self-documenting
+- **Target newcomers**: Write for someone reading the codebase for the first time
+- **Avoid redundancy**: Don't describe what clean code already expresses clearly
+
+### When to Comment
+1. **Complex algorithms**: Brief explanation of the approach or mathematical concept
+2. **Non-obvious decisions**: When using an unusual technique, briefly explain why
+3. **Domain concepts**: When code implements a specific business rule or domain concept
+4. **Workarounds**: If code works around a limitation, briefly note the constraint
+5. **Performance choices**: When choosing a less obvious approach for performance
+
+### When NOT to Comment
+1. **Obvious code**: Don't explain what well-named functions/variables already convey
+2. **Conversation context**: Never reference "as discussed" or "per our conversation"
+3. **Implementation details**: Don't narrate each step of straightforward logic
+4. **Type information**: Don't repeat what the type system already enforces
+
+### Comment Style
+- Place conceptual comments above functions/blocks
+- Keep comments concise and factual
+- Use present tense ("Calculates..." not "Will calculate...")
+- Focus on "why" and "what" at a high level, not "how" line-by-line
+
+### Examples
+
+Good:
+```rust
+// Apply marching cubes algorithm to generate mesh from voxel data
+fn generate_mesh(voxels: &VoxelGrid) -> Mesh {
+    // ...
+}
+
+// Use binary search for O(log n) lookup in sorted player scores
+fn find_player_rank(scores: &[Score], target: Score) -> Option<usize> {
+    // ...
+}
+```
+
+Bad:
+```rust
+// This function generates a mesh (redundant - function name is clear)
+fn generate_mesh(voxels: &VoxelGrid) -> Mesh {
+    // First we iterate through voxels (obvious from code)
+    for voxel in voxels {
+        // Check if voxel is solid (obvious from code)
+        if voxel.is_solid() {
+            // ...
+        }
+    }
+}
+
+// As we discussed, using this approach (references conversation)
+fn process_input() {
+    // ...
+}
+```
+
+### Mathematical/Algorithm Comments
+When implementing known algorithms or mathematical concepts, add a brief reference:
+
+```rust
+// Catmull-Rom spline interpolation for smooth camera paths
+fn interpolate_camera_path(points: &[Vec3], t: f32) -> Vec3 {
+    // ...
+}
+
+// Perlin noise generation for terrain heightmap
+fn generate_terrain(seed: u64, scale: f32) -> HeightMap {
+    // ...
+}
+```
+
+### Domain Logic Comments
+When code embodies specific game rules or business logic:
+
+```rust
+fn calculate_damage(attacker: &Entity, defender: &Entity) -> f32 {
+    // Critical hits deal 2x damage when attacker's luck > 0.8
+    let crit_multiplier = if attacker.luck > 0.8 { 2.0 } else { 1.0 };
+    
+    // Armor reduces damage by 10% per point, capped at 90% reduction
+    let armor_reduction = (defender.armor * 0.1).min(0.9);
+    
+    // ...
+}
+```
+
+### Application
+- When generating code, only add comments where they genuinely aid understanding
+- Prefer self-documenting code through good naming over explanatory comments
+- Never reference the conversation or explain edits in comments
+- Keep mathematical/algorithmic explanations brief and at the function level

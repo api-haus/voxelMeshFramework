@@ -1,0 +1,23 @@
+{
+	"name": "Voxels.Core",
+	"rootNamespace": "Voxels",
+	"references": [
+		"ALINE",
+		"Unity.Mathematics",
+		"Unity.Collections",
+		"Unity.Burst",
+		"Unity.Entities",
+		"Voxels.SurfaceNets",
+		"Unity.Transforms",
+		"Unity.Logging"
+	],
+	"autoReferenced": false,
+	"allowUnsafeCode": true,
+	"versionDefines": [
+		{
+			"name": "com.arongranberg.aline",
+			"expression": "1.0.0",
+			"define": "ALINE"
+		}
+	]
+}

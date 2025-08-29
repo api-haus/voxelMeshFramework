@@ -1,0 +1,12 @@
+{
+	"name": "Voxels.SurfaceNets",
+	"rootNamespace": "Voxels",
+	"references": [
+		"Unity.Mathematics",
+		"Unity.Collections",
+		"Unity.Burst",
+		"Unity.Logging"
+	],
+	"allowUnsafeCode": true,
+	"autoReferenced": false
+}

@@ -1,0 +1,115 @@
+BEGIN_OPTIONS
+//ShaderTarget "5.0"
+END_OPTIONS
+
+BEGIN_PROPERTIES
+[BetterHeader(PBR)]
+[NoScaleOffset] _Diffuse("Albedo&Height", 2DArray) = "white" {}                     //
+[NoScaleOffset] _NormalSAO("Normal&Smooth&AO", 2DArray) = "bump" {}                    //
+[NoScaleOffset] _EmissiveMetallic("Emissive&Metallic", 2DArray) = "black" {}                    //
+_NormalStrength("Normal Strength", Float) = 1.0                              //
+_EmissiveStrength("Emissive Strength", Float) = 1.0                              //
+[BetterHeader(Effects)]  //
+[Toggle(_USE_FRESNEL)] _UseFresnel("Fresnel", Float) = 0  //
+_FresnelPower("Fresnel Power", Range(0.5,16)) = 1.0                                            //
+_FresnelStrength("Fresnel Strength", Range(0.01,2)) = 1.0                                            //
+[BetterHeader(Sampling)]  //
+[Toggle(_USE_BIPLANAR)] _UseBiplanar("Biplanar (on) Triplanar (off)", Float) = 0  //
+_UVScale("UV Scale", Float) = 1.0                                            //
+_BlendContrast("Blend Contrast", Range(0.5,8)) = 1.0                                            //
+_Channel("Channel", Int) = 1                                                 //
+[BetterHeader(Displacement)]
+[Toggle(_USE_VERTEX_DISPLACEMENT)] _VertexDisplacement("Vertex Displacement", Float) = 0  //
+_VertexDisplacementStrength("Vertex Displacement Strength", Range(0,2.0)) = 1.0                                            //
+[Toggle(_USE_PARALLAX)] _UseParallax("Parallax", Float) = 0  //
+_Parallax("Scale", Range(0.005, 0.08)) = 0.005
+END_PROPERTIES
+
+BEGIN_CBUFFER
+half _NormalStrength;
+half _EmissiveStrength;
+half _FresnelPower;
+half _FresnelStrength;
+half _UVScale;
+half _BlendContrast;
+int _Channel;
+half _VertexDisplacementStrength;
+half _Parallax;
+END_CBUFFER
+
+BEGIN_DEFINES
+#pragma shader_feature_local _ _USE_VERTEX_DISPLACEMENT
+#pragma shader_feature_local _ _USE_PARALLAX
+#pragma shader_feature_local _ _USE_FRESNEL
+#pragma shader_feature_local _ _USE_BIPLANAR
+#define _WORLDSPACENORMAL 1
+END_DEFINES
+
+BEGIN_CODE
+TEXTURE2D_ARRAY(_Diffuse);
+SAMPLER(sampler_Diffuse);
+TEXTURE2D_ARRAY(_NormalSAO);
+SAMPLER(sampler_NormalSAO);
+TEXTURE2D_ARRAY(_EmissiveMetallic);
+
+#if _USE_BIPLANAR
+#include "./Biplanar.hlsl"
+#define kSampler BiplanarTextureArraySampler
+#else
+#include "./Triplanar.hlsl"
+#define kSampler TriplanarTextureArraySampler
+#endif
+
+#include "./Parallax.hlsl"
+
+void ModifyVertex(inout VertexData v, inout ExtraV2F d)
+{
+#if _USE_VERTEX_DISPLACEMENT
+  kSampler s = (kSampler)0;
+
+  s.gather(v.normal,TransformObjectToWorld(v.vertex));
+  half height = s.sampleHeightLOD(_Channel, 0, _Diffuse, sampler_Diffuse);
+  v.vertex.xyz += v.normal * (height - .5) * _VertexDisplacementStrength;
+#endif
+}
+
+void SurfaceFunction(inout Surface o, ShaderData d) {
+  kSampler s = (kSampler)0;
+
+  s.gather(d.localSpaceNormal, d.worldSpacePosition);
+
+	{
+		half4 sam = s.sample(_Channel, _Diffuse, sampler_Diffuse);
+
+		o.Height = sam.a;
+#if _USE_PARALLAX
+	}
+
+	{
+		half2 offset = ParallaxOffsetT(o.Height, _Parallax, d.tangentSpaceViewDir);
+		s.offset(offset);
+
+		half4 sam = s.sample(_Channel, _Diffuse, sampler_Diffuse);
+#endif
+
+		o.Albedo = sam.rgb;
+#if _USE_PARALLAX
+		o.Height = sam.a;
+#endif
+	}
+
+  s.sampleNormal(d.localSpaceNormal, _Channel, _NormalSAO, sampler_NormalSAO,
+                 o.Normal, o.Smoothness, o.Occlusion);
+
+	{
+		half4 emissiveMetal = s.sample(_Channel, _EmissiveMetallic, sampler_Diffuse);
+		o.Metallic = emissiveMetal.a;
+		o.Emission = emissiveMetal.rgb * _EmissiveStrength;
+  }
+
+#if _USE_FRESNEL
+	o.Albedo += o.Albedo * pow((1.0 - saturate(dot(d.worldSpaceNormal, d.worldSpaceViewDir))), _FresnelPower) * _FresnelStrength;
+#endif
+}
+
+END_CODE

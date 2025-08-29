@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+
+This project is built with Unity game engine, written in C#.
+
+Follow this formatting convention:
+
+indent_style = tab
+indent_size = 2

@@ -1,0 +1,136 @@
+---
+globs: *.rs,*.cs
+alwaysApply: false
+---
+### Rule Name: domain-oriented-programming (DOP)
+
+### Description
+Guidance for Cursor to design and factor systems using domain-oriented programming. Always structure Rust modules around the domain, keep the domain pure and dependency-free, and isolate side effects behind ports (traits). Prefer small scripts with one or two functions (e.g., `main` + `run`) as thin orchestration layers that call application services.
+
+### Objectives
+- Keep domain code simple, testable, and independent of frameworks and I/O.
+- Model the business language with explicit types and names.
+- Encapsulate side effects at the edges using ports/adapters.
+- Enable incremental growth by extracting/use-cases and modules only when friction appears.
+
+### Core Principles
+- Boundaries first: define modules by domain concepts; keep APIs stable and minimal.
+- Ubiquitous language: types and names should mirror domain terminology. Use names that describe the essense instead of technical words like "domain", "views", "controllers".
+- Pure domain: no I/O, no clocks, no randomness; pass capabilities as traits.
+- Ports and adapters: define traits as ports; provide concrete adapters in infrastructure.
+- Application layer: orchestrates use-cases; composes domain capabilities and adapters.
+- Small scripts: prefer 1–2 functions per script; scripts do wiring, not business logic.
+- Minimize coupling: depend on abstractions inwards; implement details outwards.
+- Testability: domain is unit-test friendly; adapters can be tested via fakes.
+- Explicit data: prefer newtypes/value objects over primitive strings/ints.
+- Errors as types: model domain errors explicitly; convert at boundaries.
+- Immutability by default; state changes via constructors/functions with clear invariants.
+- Incremental extraction: refactor to new modules/use-cases when needed, not preemptively.
+
+### Heuristics and Defaults
+- For any new feature, start in the domain; only add infra when needed.
+- When touching time, UUIDs, env, filesystem, network, DB: introduce a trait port.
+- Prefer free functions in `domain` for behavior; methods when maintaining invariants.
+- Keep functions focused (generally ≤ 30–40 LOC) and do one thing.
+- In domain, return `Result<T, DomainError>` (or specific error enums). At CLI/HTTP edges, map to user-facing errors.
+- Avoid global state/singletons. Pass dependencies explicitly (constructors/struct fields).
+- Keep public re-exports curated via `prelude` modules when helpful.
+
+### Rust Module Structure (Recommended)
+- `src/domain/` (no external deps other than type libs):
+  - `mod.rs` (re-exports), `types.rs` (newtypes/value objects), `entities.rs`, `services.rs` (pure functions), `events.rs` (optional), `ports.rs` (traits for capabilities like clock/ids/repo).
+- `src/app/` (use-cases/orchestration):
+  - `mod.rs`, `commands.rs`, `queries.rs`, `services.rs` (compose domain + ports), optional `prelude.rs`.
+- `src/infra/` (adapters):
+  - `mod.rs`, `persistence/`, `http/`, `cli/`, `time.rs`, `uuid.rs`, etc. Implement domain/app ports here.
+- Scripts:
+  - `src/bin/*.rs` or `examples/*.rs`: each file is a tiny program with 1–2 functions (`main` + `run`). Do wiring and call app use-cases.
+
+Example layout:
+```
+src/
+  domain/
+    mod.rs
+    types.rs
+    entities.rs
+    services.rs
+    ports.rs
+  app/
+    mod.rs
+    commands.rs
+    queries.rs
+    services.rs
+  infra/
+    mod.rs
+    persistence/
+      mod.rs
+      in_memory.rs
+      postgres.rs
+    time.rs
+    uuid.rs
+  bin/
+    seed.rs
+```
+
+### Minimal Example (Conceptual)
+```rust
+// src/domain/ports.rs
+pub trait Clock { fn now_utc(&self) -> time::OffsetDateTime; }
+pub trait Ids { fn new_order_id(&self) -> uuid::Uuid; }
+
+// src/domain/types.rs
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct OrderId(pub uuid::Uuid);
+
+// src/domain/entities.rs
+use crate::domain::types::OrderId;
+#[derive(Clone, Debug)]
+pub struct Order { pub id: OrderId, pub created_at: time::OffsetDateTime }
+impl Order { pub fn new(id: OrderId, at: time::OffsetDateTime) -> Self { Self { id, created_at: at } } }
+
+// src/domain/services.rs
+use crate::domain::{ports::{Clock, Ids}, types::OrderId, entities::Order};
+pub fn create_order(clock: &impl Clock, ids: &impl Ids) -> Order {
+    Order::new(OrderId(ids.new_order_id()), clock.now_utc())
+}
+
+// src/app/services.rs
+use crate::domain::{ports::{Clock, Ids}, services::create_order};
+pub trait Orders { type Error; fn save(&self, order: &crate::domain::entities::Order) -> Result<(), Self::Error>; }
+pub struct CreateOrder<'a> { pub clock: &'a dyn Clock, pub ids: &'a dyn Ids, pub orders: &'a dyn Orders<Error=anyhow::Error> }
+impl<'a> CreateOrder<'a> { pub fn run(&self) -> anyhow::Result<()> { let order = create_order(self.clock, self.ids); self.orders.save(&order)?; Ok(()) } }
+
+// src/bin/seed.rs (script: 1–2 functions)
+fn main() -> anyhow::Result<()> { run() }
+fn run() -> anyhow::Result<()> {
+    // wire adapters, call use-cases
+    Ok(())
+}
+```
+
+### When to Extract/Split
+- A module exceeds a single responsibility or grows >~500 LOC.
+- A concept gains its own vocabulary/types/invariants.
+- Two areas change for different reasons; split to reduce change ripple.
+- Tests are awkward or require heavy fixtures; extract pure domain where possible.
+
+### Triggers for This Rule
+- Designing a new feature, reorganizing modules, adding a CLI/bin, adding infra (DB/HTTP/FS/time/UUID), or writing examples/scripts.
+
+### Agent Response Guidelines
+- Default to small scripts (1–2 functions) for CLIs/examples; keep logic in app/domain.
+- Propose domain-first APIs and trait ports for side effects.
+- Refuse to leak infra types into domain; wrap in newtypes or ports instead.
+- Provide minimal, runnable Rust examples and module skeletons.
+- Write tests at the domain/app levels; keep adapters thin.
+
+### Checklist (Before Submitting Changes)
+- Domain code is pure and dependency-free; names reflect domain language.
+- Side effects are behind trait ports; adapters live in `infra`.
+- Use-cases (app) compose domain + ports; scripts are thin.
+- Types/newtypes capture invariants; errors are explicit and mapped at edges.
+- Functions are small and focused; modules reflect responsibilities.
+
+### Non-goals
+- Not prescribing a heavy framework; do the simplest domain-first thing that works.
+- Not forcing premature decomposition; extract when justified by friction.

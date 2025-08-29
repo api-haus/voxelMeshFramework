@@ -1,0 +1,28 @@
+---
+globs: *.cs
+alwaysApply: false
+---
+### C# Script File and Class Naming Rule
+
+Ensure every C# script file is named after its primary top-level class and keep the number of top-level classes per file small to improve clarity and Unity compatibility.
+
+#### Principles
+- **Filename matches class**: `FileName.cs` must match the primary top-level class name `public class FileName` (PascalCase).
+- **Unity types**: For `MonoBehaviour` and `ScriptableObject`, the filename must match the class Unity instantiates.
+- **Max two classes per file**: Never place more than 2 top-level classes in the same `.cs` file. Prefer one.
+- **Nested types**: Nested classes/structs/enums inside a class do not count toward the top-level class limit.
+- **Partials**: Partial classes may span multiple files; each file should still be named after the partial class it defines.
+
+#### Allowed patterns
+- `PlayerController.cs` → contains `public class PlayerController : MonoBehaviour { ... }`
+- `VoxelChunk.cs` → contains one primary class; may also include one small, tightly related top-level helper class if necessary.
+
+#### Forbidden patterns
+- `Utils.cs` containing three unrelated top-level classes (`Parser`, `Helper`, `Formatter`).
+- `movement.cs` containing `public class PlayerMovement` (filename casing or name mismatch).
+
+#### Assistant application
+- When generating a new C# script, create one top-level class whose name matches the file.
+- If adding a second top-level class is unavoidable, keep it minimal and related; never exceed two.
+- When editing an existing file where class and filename mismatch, prefer renaming the file to match the class (unless project conventions require the opposite).
+

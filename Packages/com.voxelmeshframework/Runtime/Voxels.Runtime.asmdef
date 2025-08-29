@@ -1,0 +1,15 @@
+{
+	"name": "Voxels.Runtime",
+	"rootNamespace": "Voxels",
+	"references": [
+		"Voxels.Core",
+		"Unity.Mathematics",
+		"Unity.Collections",
+		"Unity.Burst",
+		"Unity.Entities",
+		"Voxels.SurfaceNets",
+		"Unity.Transforms",
+		"Unity.Logging"
+	],
+	"autoReferenced": true
+}

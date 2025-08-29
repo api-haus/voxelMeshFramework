@@ -1,0 +1,92 @@
+namespace Voxels.Samples.SampleControllers
+{
+	using Core.Stamps;
+	using Unity.Mathematics;
+	using Unity.Mathematics.Geometry;
+	using UnityEngine;
+	using UnityEngine.InputSystem;
+
+	[RequireComponent(typeof(Camera))]
+	public class SampleFirstPersonDiggingCamera : MonoBehaviour
+	{
+		[SerializeField]
+		InputActionReference digAction;
+
+		[SerializeField]
+		InputActionReference placeAction;
+
+		[SerializeField]
+		float radius = 1.5f;
+
+		[SerializeField]
+		[Range(0, 1)]
+		float digStrength = .5f;
+
+		[SerializeField]
+		[Range(0, 1)]
+		float placeStrength = .5f;
+
+		[SerializeField]
+		float maxDistance = 20f;
+
+		[SerializeField]
+		LayerMask layerMask = 1;
+
+		readonly RaycastHit[] m_Hits = new RaycastHit[1];
+
+		Camera m_Camera;
+
+		bool m_DigPressed;
+		bool m_PlacePressed;
+
+		void Awake()
+		{
+			TryGetComponent(out m_Camera);
+		}
+
+		void Update()
+		{
+			m_DigPressed = digAction.action.IsPressed();
+			m_PlacePressed = placeAction.action.IsPressed();
+		}
+
+		void FixedUpdate()
+		{
+			var ray = m_Camera.ViewportPointToRay(Vector3.one * .5f);
+
+			if (Physics.RaycastNonAlloc(ray, m_Hits, maxDistance, layerMask) == 0)
+				return;
+
+			float3 point = m_Hits[0].point;
+
+			var stamp = new NativeVoxelStampProcedural
+			{
+				shape = new ProceduralShape
+				{
+					shape = ProceduralShape.Shape.SPHERE,
+					sphere = new ProceduralSphere
+					{
+						//
+						center = point,
+						radius = radius,
+					},
+				},
+				bounds = MinMaxAABB.CreateFromCenterAndExtents(point, radius * 2f),
+				strength = -digStrength,
+				material = 0,
+			};
+
+			if (m_DigPressed)
+			{
+				stamp.strength = -digStrength;
+				VoxelAPI.Stamp(stamp);
+			}
+
+			if (m_PlacePressed)
+			{
+				stamp.strength = placeStrength;
+				VoxelAPI.Stamp(stamp);
+			}
+		}
+	}
+}

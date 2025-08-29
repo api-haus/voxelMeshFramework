@@ -1,0 +1,3 @@
+[submodule "Packages/com.auburn.fastnoise2"]
+	path = Packages/com.auburn.fastnoise2
+	url = git@github.com:api-haus/com.auburn.fastnoise2.git

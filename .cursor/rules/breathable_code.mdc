@@ -1,0 +1,87 @@
+---
+globs: *.cs,*.rs
+alwaysApply: false
+---
+## Breathable Code Spacing Rule
+
+Add intentional vertical whitespace to make code easier to scan. Prefer short, meaningful "paragraphs" of code separated by blank lines. Do not change program behavior or formatting beyond spacing between logical sections.
+
+### Principles
+- **Group by idea**: Split code into small, coherent steps separated by a single blank line.
+- **Prefer clarity over density**: One blank line beats inline end-of-line comments or packed code blocks.
+- **Stay within formatter bounds**: Respect `rustfmt.toml` and existing style; never fight the formatter.
+- **Be consistent**: Avoid more than 2 consecutive blank lines.
+
+### Defaults (Rust)
+- **Top-level items**: Place 1 blank line between `use`/`mod` blocks and the rest; 1 blank line between items (`struct`, `enum`, `trait`, `impl`, `fn`). Use 2 blank lines only to separate major conceptual sections inside long files.
+- **Imports**: Group related `use` lines; keep 1 blank line between groups.
+- **Inside functions**:
+  - Add a blank line between logically distinct steps (setup, compute, emit/return).
+  - Add a blank line before control-flow blocks (`if`, `match`, `loop`, `for`, `while`) when they start a new step, and after them if different work follows.
+  - Add a blank line before early `return` if it ends a multi-step function.
+  - Keep at most 1 blank line at boundaries; no blank line at the start or end of a block.
+- **Impl blocks**: Keep 1 blank line between methods.
+- **Comments**: Insert a blank line before a comment that summarizes the next section; keep doc comments attached to the item (no blank line between `///` and the item).
+
+### Bevy plugin guidance
+- In `Plugin::build`, group chained calls with blank lines between conceptual phases:
+  - Resources/config and events
+  - Schedule/set configuration
+  - Startup systems
+  - Update systems grouped by `SystemSet`/phase (e.g., Input, Movement, Post)
+
+Example (excerpt):
+```rust
+impl Plugin for PlayerPlugin {
+  fn build(&self, app: &mut App) {
+    app
+      .init_resource::<player::config::PlayerConfig>()
+      .add_event::<player::actions::PlayerPunchEvent>()
+
+      .configure_sets(
+        Update,
+        (PlayerSet::Input, PlayerSet::Movement, PlayerSet::Post).chain(),
+      )
+
+      .add_systems(Startup, player::spawn::spawn_player)
+
+      .add_systems(
+        Update,
+        (
+          player::actions::read_actions.in_set(PlayerSet::Input),
+
+          player::movement::apply_movement.in_set(PlayerSet::Movement),
+
+          player::movement::visualize_player_movement.in_set(PlayerSet::Post),
+        ),
+      );
+  }
+}
+```
+
+### Example (function spacing)
+```rust
+pub fn compute_something(input: &Input) -> Output {
+  // setup
+  let normalized = normalize(input);
+  let params = derive_params(&normalized);
+
+  // compute
+  let intermediate = heavy_step(&normalized, &params);
+
+  // finalize
+  let out = finalize(intermediate);
+
+  return out;
+}
+```
+
+### Limits and non-goals
+- Do not exceed 2 consecutive blank lines.
+- Do not separate attributes or doc comments from their items.
+- Do not reflow long method chains solely to insert blank lines inside the chain.
+- Do not introduce trailing whitespace.
+
+### Assistant application
+- When generating or editing code, apply these spacing rules by default.
+- Preserve existing indentation and style; only insert blank lines as described.

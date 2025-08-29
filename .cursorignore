@@ -1,0 +1,15 @@
+Assets/
+Packages/com.jbooth*
+ProjectSettings/
+
+!Library/
+Library/*
+Library/PackageCache/*
+!Library/PackageCache
+!Library/PackageCache/com.unity.mathematics*
+!Library/PackageCache/com.unity.entities*
+!Library/PackageCache/com.unity.burst*
+!Library/PackageCache/com.unity.collections*
+!Library/PackageCache/com.unity.inputsystem*
+!Library/PackageCache/com.unity.cinemachine*
+!Library/PackageCache/com.unity.test-framework*

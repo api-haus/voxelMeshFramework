@@ -1,0 +1,43 @@
+---
+globs: *.cs
+alwaysApply: false
+---
+
+### Unity Jobs Scheduling Rule
+
+Schedule jobs from the managing thread only. Never schedule jobs from inside other jobs. After enqueuing many jobs, call `JobHandle.ScheduleBatchedJobs()` to push work to the worker threads promptly.
+
+#### Principles
+- Jobs cannot schedule other jobs within their `Execute` methods.
+- Chain dependencies via `JobHandle` and combine with `JobHandle.CombineDependencies`.
+- Batch scheduling on the main/managing thread, then call `JobHandle.ScheduleBatchedJobs()`.
+- Complete only when necessary (`handle.Complete()`), prefer dependency chaining to maximize parallelism.
+
+#### Basic pattern
+```csharp
+// Schedule independent jobs
+var h1 = jobA.Schedule(dependsOn);
+var h2 = jobB.Schedule(dependsOn);
+
+// Combine and schedule dependents
+var h12 = JobHandle.CombineDependencies(h1, h2);
+var h3 = jobC.Schedule(h12);
+
+// Flush batched schedules to the worker pool
+JobHandle.ScheduleBatchedJobs();
+
+// Only complete when results are needed
+// h3.Complete();
+```
+
+#### Notes
+- Use `IJobParallelFor`, `IJobFor`, or `IJob` variants appropriate to the workload.
+- Avoid calling into managed code or UnityEngine APIs in jobs.
+- Prefer `NativeArray`/`NativeList`/`NativeHashMap` for data.
+- For large batches, consider granularity (batch size) to balance overhead vs. parallelism.
+
+#### Anti-patterns
+- Scheduling from within `Execute` of any job (unsupported).
+- Overusing `Complete()` early, which serializes the pipeline.
+- Scheduling many tiny jobs without batching or appropriate batch size.
+

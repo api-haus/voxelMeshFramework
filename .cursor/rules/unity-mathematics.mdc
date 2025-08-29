@@ -1,0 +1,90 @@
+---
+globs: *.cs
+alwaysApply: false
+---
+### Unity.Mathematics Types Rule
+
+Prefer `Unity.Mathematics` value types and math utilities in all C# scripts. Keep `UnityEngine` math types at adapter edges only (when calling engine APIs), and convert to `Unity.Mathematics` immediately.
+
+#### Principles
+- **Default types**: Use `float2/float3/float4`, `int2/int3/int4`, `uint*`, `quaternion`, `float3x3/float4x4`.
+- **Math functions**: Add `using static Unity.Mathematics.math;` and call functions unqualified (e.g., `normalize`, `length`, `clamp`, `mul`). Avoid `Mathf`.
+- **Scalars**: Prefer `float` over `double` unless a native API requires `double`.
+- **Random**: Use `Unity.Mathematics.Random` for deterministic, Burst-safe RNG.
+- **Interop boundary**: Convert to/from `UnityEngine.Vector3/Quaternion/Matrix4x4` only at call boundaries.
+
+#### Allowed vs. Boundary-only
+- **Allowed (everywhere)**: `float3`, `quaternion`, `float4x4`, `Unity.Mathematics.Random`, unqualified math functions via static import.
+- **Boundary-only (adapter code)**: `UnityEngine.Vector2/Vector3/Vector4`, `UnityEngine.Quaternion`, `UnityEngine.Matrix4x4`.
+
+#### Conversions (patterns)
+```csharp
+using Unity.Mathematics;
+using UnityEngine;
+using static Unity.Mathematics.math;
+
+// Vector3 ↔ float3
+float3 p = new float3(transform.position.x, transform.position.y, transform.position.z);
+transform.position = new Vector3(p.x, p.y, p.z);
+
+// Quaternion ↔ quaternion
+quaternion q = new quaternion(transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w);
+transform.rotation = new Quaternion(q.value.x, q.value.y, q.value.z, q.value.w);
+
+// Matrix4x4 ↔ float4x4
+Matrix4x4 m = transform.localToWorldMatrix;
+float4x4 mf = new float4x4(
+	new float4(m.m00, m.m10, m.m20, m.m30),
+	new float4(m.m01, m.m11, m.m21, m.m31),
+	new float4(m.m02, m.m12, m.m22, m.m32),
+	new float4(m.m03, m.m13, m.m23, m.m33)
+);
+```
+
+#### Math usage examples
+```csharp
+using Unity.Mathematics;
+using static Unity.Mathematics.math;
+
+float3 velocity = new float3(1f, 0f, 0f);
+float3 position = new float3(0f, 0f, 0f);
+float dt = 0.016f;
+
+position += velocity * dt;
+float len = length(position);
+float3 dir = select(float3.zero, normalize(position), len > 0f);
+
+quaternion rot = quaternion.AxisAngle(normalize(new float3(0f, 1f, 0f)), radians(90f));
+float4x4 trs = float4x4.TRS(position, rot, new float3(1f, 1f, 1f));
+```
+
+#### Static import shorthand
+```csharp
+using static Unity.Mathematics.math;
+
+float y = floor(t); // preferred
+// Avoid: float y2 = math.floor(t);
+```
+
+#### Random usage
+```csharp
+using Unity.Mathematics;
+
+// Seed must be non-zero
+var rng = new Random(0x6E624EB7u);
+float r01 = rng.NextFloat();
+int rInt = (int)rng.NextUInt(0u, 100u);
+float3 jitter = rng.NextFloat3(new float3(-1f), new float3(1f));
+```
+
+#### Guidance & rationale
+- **Burst/HPC# alignment**: `Unity.Mathematics` types are blittable and optimized for Burst and Jobs.
+- **Consistency**: Using the same math types across gameplay and jobs reduces conversions and bugs.
+- **Interop discipline**: Keep UnityEngine math types at the outer edge; convert once, compute with `Unity.Mathematics`.
+
+#### Review checklist
+- **Types** use `float3/quaternion/float4x4` (no `Vector3/Quaternion/Matrix4x4` in core logic).
+- **Math** calls use static import (`using static Unity.Mathematics.math;`), no `math.` prefix and no `Mathf`.
+- **RNG** uses `Unity.Mathematics.Random` with a non-zero seed.
+- **Interop** conversions happen only at API boundaries.
+

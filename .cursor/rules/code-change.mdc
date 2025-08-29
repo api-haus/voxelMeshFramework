@@ -1,0 +1,90 @@
+---
+# globs: crates/**,docs/**
+alwaysApply: false
+---
+## Code Change Protocol
+
+**IMPORTANT**: Before implementing any code changes or modifications, you MUST:
+
+1. **Present a Change Proposal Outline** that includes:
+   - A clear summary of what changes will be made
+   - A detailed breakdown of each change, organized by:
+     - File/module affected
+     - Specific modifications planned
+     - Rationale for each change
+   - Expected outcomes and benefits
+   - Any potential risks or considerations
+
+2. **Describe Each Change Eloquently** by:
+   - Using clear, technical language that explains the "why" behind each modification
+   - Highlighting architectural impacts or design pattern changes
+   - Noting any dependencies or related changes that may be needed
+   - Identifying any breaking changes or migration requirements
+
+3. **Wait for Approval** before proceeding with implementation
+   - Only after the outline is reviewed should actual code changes begin
+   - If clarification is needed, ask before implementing
+
+## Specification Writing Protocol
+
+When creating or updating specifications:
+
+1. **Always write specifications as Markdown files** in the `docs/` directory
+2. **Follow naming conventions**:
+   - Use descriptive, lowercase filenames with underscores (e.g., `feature_specification.md`)
+   - Include version or date in filename if relevant (e.g., `api_spec_v2.md`)
+3. **Structure specifications** with:
+   - Clear headings and subheadings
+   - Code examples in appropriate language blocks
+   - Diagrams using Mermaid when helpful
+   - References to related documentation
+
+## Example Change Proposal Format
+
+```
+## Proposed Changes for [Feature/Fix Name]
+
+### Summary
+Brief overview of what will be changed and why.
+
+### Detailed Changes
+
+#### 1. [Component/File Name]
+- **Location**: `path/to/file.rs`
+- **Changes**: 
+  - Modify function X to...
+  - Add new struct Y for...
+- **Rationale**: This change improves...
+
+#### 2. [Another Component]
+- **Location**: `path/to/another_file.rs`
+- **Changes**: 
+  - Refactor module to...
+- **Rationale**: This enables...
+
+### Expected Outcomes
+- Performance improvement of X%
+- Better code organization
+- Enhanced maintainability
+
+### Considerations
+- Potential breaking changes: None/List them
+- Migration steps if needed
+- Testing requirements
+```
+
+## Project-Specific Guidelines
+
+1. **Rust Code Changes**:
+   - Consider impact on both library crates and demo app
+   - Note any changes to public APIs
+   - Consider performance implications for voxel operations
+
+2. **Asset and Shader Changes**:
+   - Document any changes to asset pipeline
+   - Note shader compatibility requirements
+
+3. **Architecture Changes**:
+   - Update architecture diagrams in docs/
+   - Consider domain-driven design principles
+   - Maintain clean separation between app/, domain/, and infra/ layers

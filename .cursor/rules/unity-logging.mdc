@@ -1,0 +1,47 @@
+---
+globs: *.cs
+alwaysApply: false
+---
+
+### Unity.Logging Usage Rule
+
+Use the `Unity.Logging` package for structured, low-overhead logging. Prefer placeholder formatting to avoid string allocations, and never log from Burst-compiled code or job `Execute` methods.
+
+#### Principles
+- Prefer `Unity.Logging` over `UnityEngine.Debug.*`.
+- Use placeholder formatting: `Log.Debug("generated {0} items", count)`.
+- Avoid string concatenation/interpolation in logs to prevent allocations.
+- Guard verbose logs with build defines to minimize cost in release builds.
+- Do not log inside Burst paths or from within jobs.
+
+#### Allowed patterns
+- `Log.Debug("format {0}", value);`
+- `Log.Info("step {0} took {1} ms", stepName, elapsedMs);`
+- `Log.Warning("missing component {0}", typeof(T).Name);`
+- `Log.Error("failed to build chunk {0}", chunkId);`
+
+#### Forbidden in hot paths (Burst/jobs)
+- Any call to `Log.*` from Burst-compiled methods or job `Execute`.
+- `UnityEngine.Debug.Log*` in performance-critical code.
+
+#### Build-time guards (recommended)
+```csharp
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+Log.Debug("generated {0} items", count);
+#endif
+```
+
+#### Pattern for logging around Burst/job work
+- Compute in Burst/job.
+- Return results/metrics.
+- Log on the managing thread after completion.
+
+Example:
+```csharp
+var handle = job.Schedule(length, batchSize, inputDeps);
+handle.Complete();
+
+// Log after completion on the main/managing thread
+Log.Info("meshed {0} chunks in {1} ms", chunkCount, stopwatch.ElapsedMilliseconds);
+```
+
