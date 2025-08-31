@@ -5,11 +5,14 @@ namespace Voxels.Core.Authoring
 
 	public class VoxelDebugging : MonoBehaviour
 	{
-		public static SharedStatic<bool> Enabled = SharedStatic<bool>.GetOrCreate<VoxelDebugging>();
+		public static readonly SharedStatic<bool> Enabled =
+			SharedStatic<bool>.GetOrCreate<VoxelDebugging>();
 
 		[Tooltip("Only works if ALINE is present.")]
 		[SerializeField]
 		bool visualGizmos = true;
+
+		public static ref bool IsEnabled => ref Enabled.Data;
 
 		void OnValidate()
 		{

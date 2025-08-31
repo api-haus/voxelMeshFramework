@@ -18,7 +18,8 @@ namespace Voxels.Core.Meshing
 				indices = nvm.meshing.indices,
 				vertices = nvm.meshing.vertices,
 				bounds = nvm.meshing.bounds,
-				recalculateNormals = true,
+				recalculateNormals = false,
+				voxelSize = nvm.volume.voxelSize,
 			}.Schedule(inputDeps);
 
 			inputDeps = new UploadMeshJob

@@ -35,10 +35,21 @@ namespace Voxels.Core.Authoring
 
 		void OnDrawGizmosSelected()
 		{
+			TryGetComponent(out MeshRenderer mr);
+
+			var b = mr.bounds;
+			Gizmos.color = Color.black;
+			Gizmos.DrawWireCube(b.center, b.size);
+
 			Gizmos.matrix = transform.localToWorldMatrix;
+
+			b = mr.localBounds;
+			Gizmos.color = Color.blue;
+			Gizmos.DrawWireCube(b.center, b.size);
 
 			float3 size = voxelSize * CHUNK_SIZE;
 
+			Gizmos.color = Color.white;
 			Gizmos.DrawWireCube(size * .5f, size);
 		}
 	}

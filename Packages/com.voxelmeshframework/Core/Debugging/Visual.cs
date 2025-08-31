@@ -36,7 +36,7 @@ namespace Voxels.Core.Debugging
 
 			public void Dispose()
 			{
-				if (VoxelDebugging.Enabled.Data)
+				if (VoxelDebugging.IsEnabled)
 					builder.Dispose();
 				else
 					builder.DiscardAndDispose();

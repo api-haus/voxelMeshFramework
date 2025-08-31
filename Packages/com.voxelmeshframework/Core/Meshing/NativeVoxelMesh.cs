@@ -7,7 +7,10 @@ namespace Voxels.Core.Meshing
 
 	public struct NativeVoxelMesh : ICleanupComponentData, INativeDisposable
 	{
-		public struct CleanupTag : IComponentData { }
+		public struct Request : IComponentData
+		{
+			public float voxelSize;
+		}
 
 		public VoxelVolumeData volume;
 		public NativeVoxelMeshing meshing;

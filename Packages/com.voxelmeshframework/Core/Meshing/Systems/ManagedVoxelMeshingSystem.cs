@@ -41,7 +41,10 @@ namespace Voxels.Core.Meshing.Systems
 			{
 				ref var nvm = ref nativeVoxelMeshRef.ValueRW;
 
-				meshFilterAttachment.attachTo.sharedMesh = nvm.meshing.meshRef;
+				var indexCount = nvm.meshing.indices.Length;
+				var hasMesh = indexCount > 16;
+
+				meshFilterAttachment.attachTo.sharedMesh = hasMesh ? nvm.meshing.meshRef : null;
 			}
 
 			// attach w/ mesh collider

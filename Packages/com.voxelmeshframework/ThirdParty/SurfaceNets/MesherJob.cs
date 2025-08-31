@@ -9,7 +9,6 @@ namespace Voxels.ThirdParty.SurfaceNets
 	using Unity.Jobs;
 	using Unity.Mathematics.Geometry;
 	using Utils;
-	using static VoxelConfig;
 	using static Intrinsics.NeonExt;
 	using static Unity.Burst.Intrinsics.Arm.Neon;
 	using static Unity.Burst.Intrinsics.X86.Sse;
@@ -17,6 +16,7 @@ namespace Voxels.ThirdParty.SurfaceNets
 	using static Unity.Burst.Intrinsics.X86.Sse4_1;
 	using static Unity.Burst.Intrinsics.X86.Ssse3;
 	using static Unity.Mathematics.math;
+	using static VoxelConfig;
 	using float3 = Unity.Mathematics.float3;
 	using v128 = Unity.Burst.Intrinsics.v128;
 
@@ -102,6 +102,8 @@ namespace Voxels.ThirdParty.SurfaceNets
 		///   Triangle-based normals are more accurate but computationally expensive.
 		/// </summary>
 		public bool recalculateNormals;
+
+		public float voxelSize;
 
 		bool m_ResetBounds;
 
@@ -540,7 +542,7 @@ namespace Voxels.ThirdParty.SurfaceNets
 			// This creates smooth surfaces by positioning vertices at the weighted average
 			// of all edge crossing points, rather than at cube centers.
 			var vertexOffset = GetVertexPositionFromSamples(samples, edgeMask);
-			var position = new float3(pos[0], pos[1], pos[2]) + vertexOffset;
+			var position = (new float3(pos[0], pos[1], pos[2]) + vertexOffset) * voxelSize;
 
 			// Create and add the new vertex to the output list
 			vertices.Add(
@@ -846,53 +848,7 @@ namespace Voxels.ThirdParty.SurfaceNets
 			// The negative sign ensures the normal points outward from the surface.
 			// The scale factor accounts for the voxel value range (-127 to 127).
 			return normal * -0.002f; // Scale factor: -1/(127*4) approximately
-		}
-
-		/// <summary>
-		///   Calculates surface normal using gradient method similar to the article's approach.
-		///   This method samples the voxel field at the vertex position and calculates gradients
-		///   using immediate neighbors, which often produces smoother and more accurate normals.
-		/// </summary>
-		/// <param name="volumePtr">Pointer to volume data</param>
-		/// <param name="pos">Integer coordinates of the cube</param>
-		/// <param name="vertexOffset">Fractional offset within the cube where the vertex is positioned</param>
-		/// <returns>Gradient-based surface normal</returns>
-		[SkipLocalsInit]
-		static unsafe float3 GetVertexNormalFromGradient(
-			sbyte* volumePtr,
-			int* pos,
-			float3 vertexOffset
-		)
-		{
-			// Calculate the actual vertex position in voxel coordinates
-			var samplePos = new float3(pos[0], pos[1], pos[2]) + vertexOffset;
-
-			// Convert to integer coordinates for sampling (use floor to get base voxel)
-			var baseX = (int)floor(samplePos.x);
-			var baseY = (int)floor(samplePos.y);
-			var baseZ = (int)floor(samplePos.z);
-
-			// Ensure we're within bounds for neighbor sampling
-			baseX = clamp(baseX, 1, CHUNK_SIZE_MINUS_TWO);
-			baseY = clamp(baseY, 1, CHUNK_SIZE_MINUS_TWO);
-			baseZ = clamp(baseZ, 1, CHUNK_SIZE_MINUS_TWO);
-
-			// Calculate base index using the volume layout: x * 1024 + y * 32 + z
-			var baseIndex = (baseX << X_SHIFT) + (baseY << Y_SHIFT) + baseZ;
-
-			// Sample center voxel
-			var centerValue = (float)volumePtr[baseIndex];
-
-			// Calculate gradient using central differences with immediate neighbors
-			// This matches the article's approach: sample_value - neighbor_value
-			var gradient = new float3(
-				centerValue - volumePtr[baseIndex + (1 << X_SHIFT)], // X+ neighbor
-				centerValue - volumePtr[baseIndex + (1 << Y_SHIFT)], // Y+ neighbor
-				centerValue - volumePtr[baseIndex + 1] // Z+ neighbor
-			);
-
-			// Return normalized gradient (negative because we want outward-facing normals)
-			return normalize(gradient);
+			// TODO: consider effect of voxelSize
 		}
 
 		/// <summary>

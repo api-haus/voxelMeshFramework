@@ -1,5 +1,6 @@
 namespace Voxels.Core.Stamps
 {
+	using Authoring;
 	using Debugging;
 	using Unity.Burst;
 	using Unity.Collections;
@@ -29,8 +30,8 @@ namespace Voxels.Core.Stamps
 
 		public void Execute()
 		{
-			var localMin = stamp.bounds.Min - volumeBounds.Min;
-			var localMax = localMin + stamp.bounds.Extents;
+			var localMin = (stamp.bounds.Min - volumeBounds.Min) * rcp(voxelSize);
+			var localMax = localMin + (stamp.bounds.Extents * rcp(voxelSize));
 			var localBounds = new MinMaxAABB(localMin, localMax);
 
 			var vMin = (int3)floor(localBounds.Min);
@@ -41,7 +42,7 @@ namespace Voxels.Core.Stamps
 
 			var vCenter = (float3)(vMax + vMin) / 2f;
 
-			var radiusVoxel = stamp.shape.sphere.radius;
+			var radiusVoxel = stamp.shape.sphere.radius * rcp(voxelSize);
 			var r2 = radiusVoxel * radiusVoxel;
 			var invRadius = 1f / radiusVoxel;
 
@@ -63,11 +64,16 @@ namespace Voxels.Core.Stamps
 				var weight = saturate(1f - (sqrt(d2) * invRadius));
 
 #if ALINE && DEBUG
-				Visual.Draw.PushDuration(1f);
-				Visual.Draw.WireBox(volumeBounds.Min + (coord * voxelSize), voxelSize);
-				Visual.Draw.PopDuration();
+				if (VoxelDebugging.IsEnabled)
+				{
+					Visual.Draw.PushDuration(1f);
+					Visual.Draw.WireBox(volumeBounds.Min + (coord * voxelSize), voxelSize);
+					Visual.Draw.PopDuration();
+				}
 #endif
 
+				if (stamp.strength > 0)
+					volumeMaterials[ptr] = stamp.material;
 				volumeSdf[ptr] = (sbyte)clamp(
 					//
 					round(

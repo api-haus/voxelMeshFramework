@@ -1,5 +1,6 @@
 namespace Voxels.Core.Stamps
 {
+	using Authoring;
 	using Meshing.Systems;
 	using Meshing.Tags;
 	using Unity.Burst;
@@ -62,15 +63,22 @@ namespace Voxels.Core.Stamps
 					concurrentStampJobs = JobHandle.CombineDependencies(concurrentStampJobs, applyStampJob);
 
 #if ALINE && DEBUG
-					Visual.Draw.PushDuration(.33f);
-					Visual.Draw.WireBox(
-						spatialVoxelObject.bounds.Center,
-						spatialVoxelObject.bounds.Extents,
-						Color.white
-					);
-					Visual.Draw.WireSphere(stamp.shape.sphere.center, stamp.shape.sphere.radius, Color.black);
-					Visual.Draw.WireBox(stamp.bounds.Center, stamp.bounds.Extents, Color.black);
-					Visual.Draw.PopDuration();
+					if (VoxelDebugging.IsEnabled)
+					{
+						Visual.Draw.PushDuration(.33f);
+						Visual.Draw.WireBox(
+							spatialVoxelObject.bounds.Center,
+							spatialVoxelObject.bounds.Extents,
+							Color.white
+						);
+						Visual.Draw.WireSphere(
+							stamp.shape.sphere.center,
+							stamp.shape.sphere.radius,
+							Color.black
+						);
+						Visual.Draw.WireBox(stamp.bounds.Center, stamp.bounds.Extents, Color.black);
+						Visual.Draw.PopDuration();
+					}
 #endif
 
 					ecb.SetComponentEnabled<NeedsRemesh>(spatialVoxelObject.entity, true);

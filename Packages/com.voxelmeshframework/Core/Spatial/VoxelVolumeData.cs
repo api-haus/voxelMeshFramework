@@ -33,12 +33,15 @@ namespace Voxels.Core.Spatial
 		[NativeDisableContainerSafetyRestriction]
 		public NativeArray<byte> materials;
 
+		public float voxelSize;
+
 		public VoxelVolumeData(Allocator allocator = Allocator.Persistent)
 		{
 			const int volumeSize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
 
 			sdfVolume = new(volumeSize, allocator);
 			materials = new(volumeSize, allocator);
+			voxelSize = 1;
 
 			unsafe
 			{
@@ -54,6 +57,7 @@ namespace Voxels.Core.Spatial
 		{
 			sdfVolume = unsafeVoxelData.GetSDF(allocator);
 			materials = unsafeVoxelData.GetMat(allocator);
+			voxelSize = 1;
 		}
 
 		public void Dispose()

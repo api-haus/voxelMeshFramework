@@ -33,12 +33,14 @@ namespace Voxels.Core.Meshing.Systems
 
 			// allocate
 			foreach (
-				var (_, entity) in Query<RefRO<NativeVoxelMesh.CleanupTag>>()
+				var (req, entity) in Query<RefRO<NativeVoxelMesh.Request>>()
 					.WithNone<NativeVoxelMesh>()
 					.WithEntityAccess()
 			)
 			{
 				var nvm = new NativeVoxelMesh(Allocator.Persistent);
+
+				nvm.volume.voxelSize = req.ValueRO.voxelSize;
 
 				ecb.AddComponent(entity, nvm);
 			}
@@ -46,7 +48,7 @@ namespace Voxels.Core.Meshing.Systems
 			// cleanup
 			foreach (
 				var (nativeVoxelMesh, entity) in Query<RefRW<NativeVoxelMesh>>()
-					.WithNone<NativeVoxelMesh.CleanupTag>()
+					.WithNone<NativeVoxelMesh.Request>()
 					.WithEntityAccess()
 			)
 			{

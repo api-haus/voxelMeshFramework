@@ -30,7 +30,7 @@ namespace Voxels.Core
 				{
 					typeof(EntityGameObjectInstanceIDAttachment),
 					typeof(NativeVoxelObject),
-					typeof(NativeVoxelMesh.CleanupTag),
+					typeof(NativeVoxelMesh.Request),
 					typeof(NeedsManagedMeshUpdate),
 					typeof(NeedsSpatialUpdate),
 					typeof(NeedsRemesh),
@@ -70,6 +70,15 @@ namespace Voxels.Core
 					voxelSize = vm.voxelSize,
 				}
 			);
+			EntityManager.SetComponentData(
+				ent,
+				new NativeVoxelMesh.Request
+				{
+					//
+					voxelSize = vm.voxelSize,
+				}
+			);
+
 			EntityManager.SetComponentData(
 				ent,
 				new EntityMeshFilterAttachment { attachTo = vm.GetComponent<MeshFilter>() }

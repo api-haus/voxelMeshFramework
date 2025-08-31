@@ -132,7 +132,8 @@ namespace Voxels.Core.Spatial
 
 				NativeList<SpatialVoxelObject> list = new(1, allocator);
 				foreach (var spatialVoxelObject in values)
-					list.Add(spatialVoxelObject);
+					if (spatialVoxelObject.bounds.Overlaps(bounds))
+						list.Add(spatialVoxelObject);
 
 				return list.AsArray();
 			}
