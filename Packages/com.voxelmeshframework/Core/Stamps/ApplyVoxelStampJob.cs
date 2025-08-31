@@ -1,7 +1,5 @@
 namespace Voxels.Core.Stamps
 {
-	using Authoring;
-	using Debugging;
 	using Unity.Burst;
 	using Unity.Collections;
 	using Unity.Collections.LowLevel.Unsafe;
@@ -62,15 +60,6 @@ namespace Voxels.Core.Stamps
 				var ptr = (x << X_SHIFT) + (y << Y_SHIFT) + z;
 
 				var weight = saturate(1f - (sqrt(d2) * invRadius));
-
-#if ALINE && DEBUG
-				if (VoxelDebugging.IsEnabled)
-				{
-					Visual.Draw.PushDuration(1f);
-					Visual.Draw.WireBox(volumeBounds.Min + (coord * voxelSize), voxelSize);
-					Visual.Draw.PopDuration();
-				}
-#endif
 
 				if (stamp.strength > 0)
 					volumeMaterials[ptr] = stamp.material;

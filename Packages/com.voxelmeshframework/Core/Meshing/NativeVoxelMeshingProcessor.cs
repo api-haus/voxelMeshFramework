@@ -14,11 +14,12 @@ namespace Voxels.Core.Meshing
 			{
 				edgeTable = SharedStaticMeshingResources.EdgeTable,
 				volume = nvm.volume.sdfVolume,
+				materials = nvm.volume.materials,
 				buffer = nvm.meshing.buffer,
 				indices = nvm.meshing.indices,
 				vertices = nvm.meshing.vertices,
 				bounds = nvm.meshing.bounds,
-				recalculateNormals = false,
+				recalculateNormals = true,
 				voxelSize = nvm.volume.voxelSize,
 			}.Schedule(inputDeps);
 

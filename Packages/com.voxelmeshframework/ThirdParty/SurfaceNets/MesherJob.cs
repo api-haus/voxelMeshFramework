@@ -8,6 +8,7 @@ namespace Voxels.ThirdParty.SurfaceNets
 	using Unity.Collections.LowLevel.Unsafe;
 	using Unity.Jobs;
 	using Unity.Mathematics.Geometry;
+	using UnityEngine;
 	using Utils;
 	using static Intrinsics.NeonExt;
 	using static Unity.Burst.Intrinsics.Arm.Neon;
@@ -66,6 +67,13 @@ namespace Voxels.ThirdParty.SurfaceNets
 		[NoAlias]
 		[ReadOnly]
 		public NativeArray<sbyte> volume;
+
+		/// <summary>
+		///   3D volume data representing voxel materials.
+		/// </summary>
+		[NoAlias]
+		[ReadOnly]
+		public NativeArray<byte> materials;
 
 		/// <summary>
 		///   Temporary buffer used for storing vertex indices during triangulation.
@@ -543,6 +551,7 @@ namespace Voxels.ThirdParty.SurfaceNets
 			// of all edge crossing points, rather than at cube centers.
 			var vertexOffset = GetVertexPositionFromSamples(samples, edgeMask);
 			var position = (new float3(pos[0], pos[1], pos[2]) + vertexOffset) * voxelSize;
+			var material = materials[(pos[0] << X_SHIFT) + (pos[1] << Y_SHIFT) + pos[2]];
 
 			// Create and add the new vertex to the output list
 			vertices.Add(
@@ -551,6 +560,7 @@ namespace Voxels.ThirdParty.SurfaceNets
 					position = position,
 					// Choose normal calculation method based on flags
 					normal = recalculateNormals ? float3.zero : GetVertexNormalFromSamples(samples),
+					color = new Color32(material, 0, 0, 0),
 				}
 			);
 

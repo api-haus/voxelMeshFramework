@@ -130,12 +130,13 @@ Material:
     - _AlphaClip: 0
     - _AlphaToMask: 0
     - _Blend: 0
-    - _BlendContrast: 8
+    - _BlendContrast: 1
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
     - _Channel: 0
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
+    - _ColorBlendContrast: 0
     - _Cull: 2
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1

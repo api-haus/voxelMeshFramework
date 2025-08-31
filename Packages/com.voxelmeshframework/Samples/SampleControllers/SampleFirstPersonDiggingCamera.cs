@@ -32,6 +32,9 @@ namespace Voxels.Samples.SampleControllers
 		[SerializeField]
 		LayerMask layerMask = 1;
 
+		[SerializeField]
+		byte paintMaterial = 1;
+
 		readonly RaycastHit[] m_Hits = new RaycastHit[1];
 
 		Camera m_Camera;
@@ -73,7 +76,7 @@ namespace Voxels.Samples.SampleControllers
 				},
 				bounds = MinMaxAABB.CreateFromCenterAndExtents(point, radius * 2f),
 				strength = -digStrength,
-				material = 0,
+				material = paintMaterial,
 			};
 
 			if (m_DigPressed)
