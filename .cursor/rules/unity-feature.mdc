@@ -1,0 +1,159 @@
+---
+alwaysApply: false
+---
+### Unity Feature Module Rule
+
+Structure Unity gameplay code around feature-scoped modules. Register behaviour in small bootstraps (MonoBehaviours) and keep heavy/domain logic in plain C# services or DOTS systems. Keep entry points thin.
+
+#### Principles
+- One module per feature: `Player`, `Camera`, `Atmosphere`, `World`, `UI`, `Debug`.
+- Modules own their folder (`Packages/com.voxelmeshframework/<Feature>/Runtime/<Feature>/` or `Assets/<Feature>/`) and may re-export a small prelude if helpful.
+- Wire features via `MonoBehaviour` bootstraps, `ScriptableObject` configs, or ECS `SystemBase/ISystem` (if using Entities/DOTS).
+- Group lifecycle by `Awake`/`OnEnable`/`Start` and Update phases; avoid heavy work in Unity callbacks—run it in Jobs/Burst or DOTS.
+- Prefer event-driven/state-based activation; guard with feature flags/configs.
+- Keep domain logic pure; bootstraps only do wiring (aligns with DOP).
+
+#### Suggested module layout (packages example)
+Packages/com.voxelmeshframework/Core/Player/
+  Runtime/
+    Player/
+      Systems/                 // optional DOTS systems (if used)
+      Services/                // pure C# services/helpers
+      Configs/PlayerConfig.asset
+  Editor/
+  Tests/
+
+#### Suggested module layout (assets example)
+Assets/Player/
+  Systems/
+  Services/
+  Configs/
+
+#### Bootstrapping usage
+- Place a single `FeatureBootstrap` in the scene or use `[RuntimeInitializeOnLoadMethod]` to create it.
+- For DOTS, register systems via assembly definition and optionally gate with custom `World`/system groups.
+
+#### Ordering and cross-feature dependencies
+- Use Script Execution Order or an explicit `GameObject` orchestrator for `MonoBehaviour`s.
+- Prefer explicit initialization order in `Awake/Start`; keep dependencies explicit via constructors/factories.
+- For DOTS, use `UpdateInGroup`, `UpdateBefore`, and `UpdateAfter` for cross-system coordination.
+
+#### Testing
+- Keep logic in pure C# classes and unit-test them (NUnit).
+- Add EditMode/PlayMode tests to verify bootstrap wiring and order where relevant.
+
+#### Project examples (voxelMeshFramework)
+- **Authoring bootstrap (MonoBehaviour) — `VoxelMesh.cs`**
+  - Thin entry that creates/destroys the ECS entity and draws gizmos; heavy logic lives in ECS/services.
+  - Key patterns: `Awake` bridges to ECS; `OnDestroy` cleans up via event; uses `Unity.Mathematics` for math types.
+  ```csharp
+  // Packages/com.voxelmeshframework/Core/Authoring/VoxelMesh.cs (excerpt)
+  [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
+  public sealed class VoxelMesh : MonoBehaviour
+  {
+	void Awake()
+	{
+		this.CreateVoxelMeshEntity(
+			gameObject.GetInstanceID(),
+			transformAttachment ? transform : null
+		);
+	}
+
+	void OnDestroy()
+	{
+		DestroyEntityByInstanceID(gameObject.GetInstanceID());
+	}
+  }
+  ```
+
+- **GameObject ↔ Entity bridge — `VoxelEntityBridge.cs`**
+  - Centralizes entity creation/configuration; adds required ECS components and attaches Unity references at the edge.
+  - Use this from bootstraps; keep `EntityManager` usage out of `MonoBehaviour.Update`.
+  ```csharp
+  // Packages/com.voxelmeshframework/Core/VoxelEntityBridge.cs (excerpt)
+  static class VoxelEntityBridge
+  {
+	public static Entity CreateVoxelMeshEntity(
+		this VoxelMesh vm,
+		int instanceId,
+		Transform attachTransform = null)
+	{
+		var types = new List<ComponentType>(new ComponentType[]
+		{
+			typeof(EntityGameObjectInstanceIDAttachment),
+			typeof(NativeVoxelObject),
+			typeof(NativeVoxelMesh.Request),
+			typeof(VoxelMeshingAlgorithmComponent),
+			typeof(NeedsManagedMeshUpdate),
+			typeof(NeedsSpatialUpdate),
+			typeof(NeedsRemesh),
+			typeof(EntityMeshFilterAttachment),
+			typeof(LocalToWorld),
+		});
+
+		// ... add optional attachments / set component data ...
+		var ent = EntityManager.CreateEntity(types.ToArray());
+		EntityManager.SetComponentData(ent, new NativeVoxelMesh.Request { voxelSize = vm.voxelSize });
+		// ... set algorithm/config, attachments, and enable/disable tags ...
+		return ent;
+	}
+  }
+  ```
+
+- **ECS allocation lifecycle — `VoxelMeshAllocationSystem.cs`**
+  - Unmanaged `ISystem` with Burst; runs in `InitializationSystemGroup`; guarded by `RequireMatchingQueriesForUpdate`.
+  - Allocates `NativeVoxelMesh` when a `NativeVoxelMesh.Request` exists; disposes when request is absent. Structural changes via `EndInitializationEntityCommandBufferSystem`.
+  ```csharp
+  // Packages/com.voxelmeshframework/Core/Meshing/Systems/VoxelMeshAllocationSystem.cs (excerpt)
+  [RequireMatchingQueriesForUpdate]
+  [UpdateInGroup(typeof(InitializationSystemGroup))]
+  public partial struct VoxelMeshAllocationSystem : ISystem
+  {
+	[BurstCompile]
+	public void OnUpdate(ref SystemState state)
+	{
+		using (VoxelProfiler.Marks.VoxelMeshAllocationSystem_Update.Auto())
+		{
+			var ecb = SystemAPI.GetSingleton<EndInitializationEntityCommandBufferSystem.Singleton>()
+				.CreateCommandBuffer(state.WorldUnmanaged);
+
+			// allocate
+			foreach (var (req, entity) in SystemAPI
+				.Query<RefRO<NativeVoxelMesh.Request>>()
+				.WithNone<NativeVoxelMesh>()
+				.WithEntityAccess())
+			{
+				using (VoxelProfiler.Marks.VoxelMeshAllocationSystem_Allocate.Auto())
+				{
+					var nvm = new NativeVoxelMesh(Allocator.Persistent);
+					nvm.volume.voxelSize = req.ValueRO.voxelSize;
+					ecb.AddComponent(entity, nvm);
+				}
+			}
+
+			// cleanup
+			foreach (var (nativeVoxelMesh, entity) in SystemAPI
+				.Query<RefRW<NativeVoxelMesh>>()
+				.WithNone<NativeVoxelMesh.Request>()
+				.WithEntityAccess())
+			{
+				using (VoxelProfiler.Marks.VoxelMeshAllocationSystem_Cleanup.Auto())
+				{
+					state.Dependency = nativeVoxelMesh.ValueRW.Dispose(state.Dependency);
+					ecb.RemoveComponent<NativeVoxelMesh>(entity);
+				}
+			}
+		}
+	}
+  }
+  ```
+
+#### Do/Don't checklist (Entities + Burst alignment)
+- **Do**
+  - Keep `MonoBehaviour` bootstraps thin; call bridge methods; avoid heavy logic in Unity callbacks.
+  - Use `ISystem` + `[BurstCompile]` for unmanaged hot paths; schedule structural changes via ECB systems.
+  - Guard with `[RequireMatchingQueriesForUpdate]`; order with `UpdateInGroup/UpdateBefore/UpdateAfter`.
+  - Prefer `Unity.Mathematics` and `Unity.Collections` in Burst paths; avoid managed types.
+- **Don't**
+  - Call `UnityEngine.*` APIs or log inside Burst/job code.
+  - Allocate/dispose native memory outside well-defined lifecycle systems.

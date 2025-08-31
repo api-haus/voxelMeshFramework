@@ -1,5 +1,5 @@
 ---
-globs: *.rs,*.cs
+description: Developing new features, following the specification or implementation plan
 alwaysApply: false
 ---
 ### Rule Name: domain-oriented-programming (DOP)

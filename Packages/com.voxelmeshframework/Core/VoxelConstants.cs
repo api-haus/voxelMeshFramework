@@ -101,7 +101,7 @@ namespace Voxels.Core
 		///   - Small enough for responsive updates
 		///   - Optimal for parallel job processing
 		///   WARNING: Changing this value requires careful consideration of:
-		///   - SIMD optimization code in MesherJob
+		///   - SIMD optimization code in NaiveSurfaceNets/FairSurfaceNets
 		///   - Memory allocation patterns
 		///   - Performance characteristics
 		///   - Bit shift constants below

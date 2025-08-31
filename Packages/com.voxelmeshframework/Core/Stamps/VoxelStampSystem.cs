@@ -8,6 +8,7 @@ namespace Voxels.Core.Stamps
 	using Unity.Entities;
 	using Unity.Jobs;
 	using UnityEngine;
+	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 	using VoxelSpatialSystem = Spatial.VoxelSpatialSystem;
@@ -33,6 +34,7 @@ namespace Voxels.Core.Stamps
 		[BurstCompile]
 		public void OnUpdate(ref SystemState state)
 		{
+			using var _ = VoxelStampSystem_Update.Auto();
 			var ecb = GetSingleton<EndSimST>().CreateCommandBuffer(state.WorldUnmanaged);
 			var sh = GetSingleton<VoxelSpatialSystem.VoxelObjectHash>();
 
@@ -43,6 +45,16 @@ namespace Voxels.Core.Stamps
 
 			foreach (var stamp in stamps)
 			{
+#if ALINE && DEBUG
+				if (VoxelDebugging.IsEnabled)
+				{
+					Visual.Draw.PushDuration(.33f);
+					Visual.Draw.WireSphere(stamp.shape.sphere.center, stamp.shape.sphere.radius, Color.black);
+					Visual.Draw.WireBox(stamp.bounds.Center, stamp.bounds.Extents, Color.black);
+					Visual.Draw.PopDuration();
+				}
+#endif
+
 				using var chunksInBounds = sh.Query(stamp.bounds);
 
 				foreach (var spatialVoxelObject in chunksInBounds)
@@ -50,33 +62,32 @@ namespace Voxels.Core.Stamps
 					var sdf = spatialVoxelObject.voxelData.GetSDF();
 					var mat = spatialVoxelObject.voxelData.GetMat();
 
-					var applyStampJob = new ApplyVoxelStampJob
+					using (VoxelStampSystem_Schedule.Auto())
 					{
-						//
-						stamp = stamp,
-						volumeSdf = sdf,
-						volumeMaterials = mat,
-						volumeBounds = spatialVoxelObject.bounds,
-						voxelSize = spatialVoxelObject.voxelSize,
-					}.Schedule(state.Dependency);
+						var applyStampJob = new ApplyVoxelStampJob
+						{
+							//
+							stamp = stamp,
+							volumeSdf = sdf,
+							volumeMaterials = mat,
+							localVolumeBounds = spatialVoxelObject.localBounds,
+							volumeLTW = spatialVoxelObject.ltw,
+							volumeWtl = spatialVoxelObject.wtl,
+							voxelSize = spatialVoxelObject.voxelSize,
+						}.Schedule(state.Dependency);
 
-					concurrentStampJobs = JobHandle.CombineDependencies(concurrentStampJobs, applyStampJob);
+						concurrentStampJobs = JobHandle.CombineDependencies(concurrentStampJobs, applyStampJob);
+					}
 
 #if ALINE && DEBUG
 					if (VoxelDebugging.IsEnabled)
 					{
 						Visual.Draw.PushDuration(.33f);
 						Visual.Draw.WireBox(
-							spatialVoxelObject.bounds.Center,
-							spatialVoxelObject.bounds.Extents,
+							spatialVoxelObject.localBounds.Center,
+							spatialVoxelObject.localBounds.Extents,
 							Color.white
 						);
-						Visual.Draw.WireSphere(
-							stamp.shape.sphere.center,
-							stamp.shape.sphere.radius,
-							Color.black
-						);
-						Visual.Draw.WireBox(stamp.bounds.Center, stamp.bounds.Extents, Color.black);
 						Visual.Draw.PopDuration();
 					}
 #endif

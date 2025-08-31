@@ -1,0 +1,42 @@
+---
+alwaysApply: false
+---
+### Unity Package Manuals First (Context7 MCP)
+
+Before proposing or implementing any code change, consult upstream manuals/documentation for the affected Unity packages and APIs using the Context7 MCP documentation tools.
+
+#### When this applies
+- Editing C# files that import Unity packages or third-party Unity tooling
+- Changing `Packages/manifest.json` dependencies or resolving compile errors referencing Unity/third-party package APIs
+- Planning upgrades/refactors touching systems like Entities/DOTS, Jobs/Burst, Rendering/URP, Input System, Timeline, Addressables, or custom packages under `com.voxelmeshframework`
+
+#### Required procedure (do this first)
+1) Identify impacted packages
+- From `using` lines, error messages, and `Packages/manifest.json`. Consider `Unity.Entities`, `Unity.Jobs`, `Unity.Burst`, `Unity.Collections`, `Unity.Mathematics`, `Unity.Rendering`, `Unity.InputSystem`, `Unity.Addressables`, and any `com.voxelmeshframework/*` packages.
+
+2) Fetch manuals with Context7
+- Resolve the library: call resolve-library-id with the package or repo name (e.g., "Unity.Entities", "Unity.Burst", "Unity.Mathematics").
+- Retrieve docs: call get-library-docs with the resolved ID. Choose a topic relevant to your change. Defaults: "Entities", "Jobs", "Burst", "Rendering", "URP", "Input System", "Addressables", "Scripting", "API reference", "migration".
+
+3) Check versions
+- Read versions in `Packages/manifest.json` and `Packages/packages-lock.json`. Prefer docs for that version; otherwise note mismatches and check migration notes/changelogs.
+
+4) Capture a brief "Manual Check" note before editing
+- Packages and versions consulted
+- Doc sections/topics reviewed
+- 2–4 bullets of key guidance or constraints to apply
+
+Example note:
+Manual Check
+- Packages: Unity.Entities(1.3), Unity.Burst(1.8), Unity.Mathematics(1.3)
+- Topics: Systems update order, IJob scheduling, Burst constraints
+- Key: Schedule on main thread only; systems ordered via UpdateInGroup/Before/After; Burst paths must be unmanaged only
+
+#### Rules of thumb
+- Prefer manual guidance over assumptions; document rationale if deviating
+- If impact is uncertain, perform the manual check anyway
+- When multiple library matches exist, pick the most relevant high-trust one; otherwise ask for clarification
+
+#### Tools
+- Use Context7 MCP: resolve-library-id → get-library-docs
+- Do not paste raw URLs; cite sections/topics by name in notes

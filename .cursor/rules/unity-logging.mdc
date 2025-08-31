@@ -1,8 +1,7 @@
 ---
-globs: *.cs
+description: Implementing Logging
 alwaysApply: false
 ---
-
 ### Unity.Logging Usage Rule
 
 Use the `Unity.Logging` package for structured, low-overhead logging. Prefer placeholder formatting to avoid string allocations, and never log from Burst-compiled code or job `Execute` methods.

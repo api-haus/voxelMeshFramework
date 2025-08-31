@@ -2,6 +2,7 @@ namespace Voxels.Core.Hybrid
 {
 	using Unity.Entities;
 	using Unity.Transforms;
+	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Mathematics.math;
 
 	[RequireMatchingQueriesForUpdate]
@@ -10,27 +11,34 @@ namespace Voxels.Core.Hybrid
 	{
 		protected override void OnUpdate()
 		{
-			foreach (
-				var (ltwRef, trs) in SystemAPI.Query<
-					RefRW<LocalTransform>,
-					// ReSharper disable once Unity.Entities.MustBeSurroundedWithRefRwRo
-					EntityGameObjectTransformAttachment
-				>()
-			)
+			using var _ = EntityGameObjectTransformSystem_Update.Auto();
+			using (EntityGameObjectTransformSystem_UpdateLTW.Auto())
 			{
-				ltwRef.ValueRW.Position = trs.attachTo.position;
-				ltwRef.ValueRW.Rotation = trs.attachTo.rotation;
-				ltwRef.ValueRW.Scale = cmax(trs.attachTo.localScale);
+				foreach (
+					var (ltwRef, trs) in SystemAPI.Query<
+						RefRW<LocalTransform>,
+						// ReSharper disable once Unity.Entities.MustBeSurroundedWithRefRwRo
+						EntityGameObjectTransformAttachment
+					>()
+				)
+				{
+					ltwRef.ValueRW.Position = trs.attachTo.position;
+					ltwRef.ValueRW.Rotation = trs.attachTo.rotation;
+					ltwRef.ValueRW.Scale = cmax(trs.attachTo.localScale);
+				}
 			}
 
-			foreach (
-				var (ltwRef, trs) in SystemAPI.Query<
-					RefRW<LocalToWorld>,
-					// ReSharper disable once Unity.Entities.MustBeSurroundedWithRefRwRo
-					EntityGameObjectTransformAttachment
-				>()
-			)
-				ltwRef.ValueRW.Value = trs.attachTo.localToWorldMatrix;
+			using (EntityGameObjectTransformSystem_UpdateLocalToWorld.Auto())
+			{
+				foreach (
+					var (ltwRef, trs) in SystemAPI.Query<
+						RefRW<LocalToWorld>,
+						// ReSharper disable once Unity.Entities.MustBeSurroundedWithRefRwRo
+						EntityGameObjectTransformAttachment
+					>()
+				)
+					ltwRef.ValueRW.Value = trs.attachTo.localToWorldMatrix;
+			}
 		}
 	}
 }

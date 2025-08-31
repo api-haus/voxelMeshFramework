@@ -1,5 +1,5 @@
 ---
-globs: *.rs,*.cs
+globs: *.cs,*.hlsl,*.surfshader,*.shader
 alwaysApply: false
 ---
 ### Rule Name: code-comments

@@ -5,6 +5,7 @@ namespace Voxels.Core.Meshing
 	using Unity.Collections;
 	using UnityEngine;
 	using UnityEngine.Rendering;
+	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Mathematics.math;
 
 	public static class SharedStaticMeshingResources
@@ -18,8 +19,9 @@ namespace Voxels.Core.Meshing
 			ref s_sharedStatic.Data.vertexAttributes;
 
 		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-		static void Init()
+		internal static void Init()
 		{
+			using var _ = SharedStaticMeshingResources_Init.Auto();
 			EdgeTable = new(256, Allocator.Persistent);
 			VertexAttributes = new(Vertex.VertexFormat, Allocator.Persistent);
 
@@ -30,6 +32,7 @@ namespace Voxels.Core.Meshing
 
 		static void FillEdgeTable()
 		{
+			using var _ = SharedStaticMeshingResources_FillEdgeTable.Auto();
 			var cubeEdges = new int[24];
 			var k = 0;
 			for (var i = 0; i < 8; ++i)

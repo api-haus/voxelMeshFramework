@@ -6,6 +6,7 @@ namespace Voxels.Core.Procedural
 	using Unity.Mathematics;
 	using Unity.Mathematics.Geometry;
 	using UnityEngine;
+	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Mathematics.math;
 	using static VoxelConstants;
 
@@ -24,6 +25,7 @@ namespace Voxels.Core.Procedural
 			JobHandle inputDeps
 		)
 		{
+			using var _ = SimpleNoiseVoxelGenerator_Schedule.Auto();
 			inputDeps = new SNoiseJob
 			{
 				bounds = bounds,
@@ -58,8 +60,10 @@ namespace Voxels.Core.Procedural
 				var coord = bounds.Min + (localCoord * voxelSize);
 
 				var noiseValue = noise.cnoise(float4(coord * scale, seed));
+				var noiseValue2 = noise.cnoise(float4(coord * scale * 2f, seed + 100));
 
 				volumeData.sdfVolume[index] = (sbyte)clamp(noiseValue * 127, -127, 127);
+				volumeData.materials[index] = (byte)clamp(noiseValue2 > .2 ? 0 : 1, 0, 255);
 			}
 		}
 	}

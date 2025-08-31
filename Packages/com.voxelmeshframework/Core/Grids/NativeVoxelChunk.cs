@@ -10,7 +10,7 @@ namespace Voxels.Core.Grids
 		public int3 coord;
 		public int gridID;
 		public float voxelSize;
-		public MinMaxAABB bounds;
+		public MinMaxAABB localBounds;
 
 		public bool Equals(NativeVoxelChunk other)
 		{

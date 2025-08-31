@@ -29,18 +29,16 @@ Rationale:
 - Tie-breaking prioritizes consistent labeling without requiring mesh splits.
 
 #### Mesh Attribute Encoding
-- Build a `Vec<[f32; 4]> colors` parallel to positions:
-  - `r = mat_id as f32 / 255.0`, `g = 0.0`, `b = 0.0`, `a = 1.0`.
-- Insert with `mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors)`.
+- Deprecated: discrete red-channel material-id encoding.
+- RGBA encodes material weights; two modes:
+  - BLENDED_RGBA_WEIGHTS: inverse-distance weights from the 8 corners.
+  - BLENDED_CORNER_SUM: per-corner counts for the 8 corners, normalized.
 - Continue outputting a single `Mesh` per chunk.
 
 #### Shader Integration (rendering materials)
-- Fragment shader reads vertex color through Bevy’s `VERTEX_COLORS` path.
-- Decode material id: `let mat_id: u32 = u32(round(in.color.r * 255.0));`
-- Phase 1 (debug): optional palette visualization controlled by a define (e.g., `DEBUG_MAT_VIS`), mapping `mat_id` to RGB for validation.
-- Phase 2: use `mat_id` to select triplanar parameters for the rendering material:
-  - MVP: small uniform arrays (e.g., color tints, tiling scale) indexed by `mat_id` modulo array length.
-  - Future: 2D texture arrays or bindless textures for per-material albedo/normal/ORM.
+- Fragment shader reads vertex color through the vertex color attribute.
+- Decode weights from RGBA and use them for triplanar/splat blending.
+- Palette/array-texture lookup can be applied per channel as needed.
 - Preserve existing PBR lighting; only modify the base-color computation before lighting.
 
 #### ECS/Systems
@@ -48,9 +46,9 @@ Rationale:
 - A future `RenderingMaterialLibrary` resource will map `u8` annotations to shader params/texture indices used by rendering materials.
 
 #### Testing & Validation
-- Unit tests (Rust) for vertex material selection:
+- Unit tests for vertex material selection:
   - Build small synthetic chunks (e.g., 3×3×3 samples) with known `sdf`/`mat` per cell.
-  - Run the selection routine against synthetic vertex positions (or a small FSN output) and assert expected labels.
+  - Run the selection routine against synthetic vertex positions (or a small FSN output) and assert expected labels/weights.
 - Render sanity:
   - Seed scene with adjacent materials; verify per-vertex coloration differs while using a single mesh per chunk.
 - Performance:
@@ -58,8 +56,8 @@ Rationale:
 
 #### Acceptance Criteria
 - Each chunk produces a single `Mesh` containing `ATTRIBUTE_POSITION`, `ATTRIBUTE_NORMAL`, and `ATTRIBUTE_COLOR`.
-- Vertex color encodes material id in the red channel as specified.
-- Shader decodes `mat_id` and can visualize or apply per-material triplanar parameters.
+- Vertex color encodes material weights in RGBA as specified.
+- Shader consumes weights and can visualize or apply per-material triplanar parameters.
 - Empty/solid chunk skip remains intact; physics colliders unaffected.
 
 #### Edge Cases
@@ -67,7 +65,7 @@ Rationale:
 - Mixed labels: selection follows minimal `abs(sdf)` and the tie rules; no special casing of ids.
 
 #### Migration Notes
-- Existing scenes compile unchanged; the shader gains optional debug path and material-indexing logic.
+- Existing scenes compile unchanged; the shader gains weight-based blending logic.
 - Authoring seeds should be updated to write material annotations (`mat`) alongside `sdf` when solids are created.
 
 

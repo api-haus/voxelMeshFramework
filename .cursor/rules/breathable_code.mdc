@@ -1,5 +1,5 @@
 ---
-globs: *.cs,*.rs
+description: Refactoring
 alwaysApply: false
 ---
 ## Breathable Code Spacing Rule
@@ -23,39 +23,47 @@ Add intentional vertical whitespace to make code easier to scan. Prefer short, m
 - **Impl blocks**: Keep 1 blank line between methods.
 - **Comments**: Insert a blank line before a comment that summarizes the next section; keep doc comments attached to the item (no blank line between `///` and the item).
 
-### Bevy plugin guidance
-- In `Plugin::build`, group chained calls with blank lines between conceptual phases:
-  - Resources/config and events
-  - Schedule/set configuration
-  - Startup systems
-  - Update systems grouped by `SystemSet`/phase (e.g., Input, Movement, Post)
+### Unity bootstrap guidance
+- In `MonoBehaviour` bootstraps, separate lifecycle sections with blank lines:
+  - Field declarations and serialized config
+  - `Awake` (allocation/setup)
+  - `OnEnable` (subscriptions)
+  - `Start` (kickoff/spawn)
+  - `Update`/`FixedUpdate` (per-frame logic), grouped by phase
+  - `OnDisable`/`OnDestroy` (cleanup)
 
 Example (excerpt):
-```rust
-impl Plugin for PlayerPlugin {
-  fn build(&self, app: &mut App) {
-    app
-      .init_resource::<player::config::PlayerConfig>()
-      .add_event::<player::actions::PlayerPunchEvent>()
+```csharp
+using UnityEngine;
 
-      .configure_sets(
-        Update,
-        (PlayerSet::Input, PlayerSet::Movement, PlayerSet::Post).chain(),
-      )
+public sealed class PlayerBootstrap : MonoBehaviour
+{
+	[SerializeField] PlayerConfig config;
 
-      .add_systems(Startup, player::spawn::spawn_player)
+	void Awake()
+	{
+		// setup
+	}
 
-      .add_systems(
-        Update,
-        (
-          player::actions::read_actions.in_set(PlayerSet::Input),
+	void OnEnable()
+	{
+		// subscribe
+	}
 
-          player::movement::apply_movement.in_set(PlayerSet::Movement),
+	void Start()
+	{
+		// kickoff
+	}
 
-          player::movement::visualize_player_movement.in_set(PlayerSet::Post),
-        ),
-      );
-  }
+	void Update()
+	{
+		// per-frame work
+	}
+
+	void OnDisable()
+	{
+		// cleanup
+	}
 }
 ```
 

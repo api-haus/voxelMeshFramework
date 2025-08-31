@@ -1,5 +1,4 @@
 ---
-globs: *.cs
 alwaysApply: false
 ---
 ### Unity.Mathematics Types Rule

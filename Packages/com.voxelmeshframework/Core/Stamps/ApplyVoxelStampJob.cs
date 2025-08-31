@@ -6,6 +6,7 @@ namespace Voxels.Core.Stamps
 	using Unity.Jobs;
 	using Unity.Mathematics;
 	using Unity.Mathematics.Geometry;
+	using static Unity.Mathematics.Geometry.Math;
 	using static Unity.Mathematics.math;
 	using static VoxelConstants;
 
@@ -19,17 +20,24 @@ namespace Voxels.Core.Stamps
 		[NativeDisableContainerSafetyRestriction]
 		public NativeArray<byte> volumeMaterials;
 
-		public MinMaxAABB volumeBounds;
+		public MinMaxAABB localVolumeBounds;
 
 		public float voxelSize;
 
 		[ReadOnly]
 		public NativeVoxelStampProcedural stamp;
 
+		public float4x4 volumeLTW;
+		public float4x4 volumeWtl;
+
 		public void Execute()
 		{
-			var localMin = (stamp.bounds.Min - volumeBounds.Min) * rcp(voxelSize);
-			var localMax = localMin + (stamp.bounds.Extents * rcp(voxelSize));
+			// Transform stamp bounds from world space to local volume space
+			var localStampBounds = Transform(volumeWtl, stamp.bounds);
+
+			// Convert to voxel coordinates relative to volume bounds
+			var localMin = (localStampBounds.Min - localVolumeBounds.Min) * rcp(voxelSize);
+			var localMax = (localStampBounds.Max - localVolumeBounds.Min) * rcp(voxelSize);
 			var localBounds = new MinMaxAABB(localMin, localMax);
 
 			var vMin = (int3)floor(localBounds.Min);
@@ -38,9 +46,16 @@ namespace Voxels.Core.Stamps
 			vMin = max(vMin, 0);
 			vMax = min(vMax, CHUNK_SIZE - 1);
 
-			var vCenter = (float3)(vMax + vMin) / 2f;
+			// Transform sphere center from world space to local volume space
+			var localSphereCenter = transform(volumeWtl, stamp.shape.sphere.center);
 
-			var radiusVoxel = stamp.shape.sphere.radius * rcp(voxelSize);
+			// Convert sphere center to voxel coordinates
+			var voxelSphereCenter = (localSphereCenter - localVolumeBounds.Min) * rcp(voxelSize);
+
+			// Calculate transformed radius accounting for scale in the transformation
+			// Extract uniform scale from the transformation matrix
+			var scale = length(volumeWtl.c0.xyz); // Assuming uniform scale
+			var radiusVoxel = stamp.shape.sphere.radius * scale * rcp(voxelSize);
 			var r2 = radiusVoxel * radiusVoxel;
 			var invRadius = 1f / radiusVoxel;
 
@@ -49,7 +64,7 @@ namespace Voxels.Core.Stamps
 			for (var z = vMin.z; z <= vMax.z; z++)
 			{
 				var coord = new float3(x, y, z);
-				var diff = coord - vCenter;
+				var diff = coord - voxelSphereCenter;
 				var d2 = dot(diff, diff);
 				if (d2 > r2)
 					continue;
@@ -61,7 +76,7 @@ namespace Voxels.Core.Stamps
 
 				var weight = saturate(1f - (sqrt(d2) * invRadius));
 
-				if (stamp.strength > 0)
+				if (stamp.strength >= 0)
 					volumeMaterials[ptr] = stamp.material;
 				volumeSdf[ptr] = (sbyte)clamp(
 					//

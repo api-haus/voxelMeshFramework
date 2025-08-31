@@ -1,8 +1,7 @@
 ---
-globs: *.cs
+description: Writing Jobs
 alwaysApply: false
 ---
-
 ### Unity Jobs Scheduling Rule
 
 Schedule jobs from the managing thread only. Never schedule jobs from inside other jobs. After enqueuing many jobs, call `JobHandle.ScheduleBatchedJobs()` to push work to the worker threads promptly.

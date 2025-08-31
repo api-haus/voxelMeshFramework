@@ -1,4 +1,5 @@
-﻿#if ENABLE_INPUT_SYSTEM
+﻿using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
 
@@ -7,427 +8,385 @@ using UnityEngine.InputSystem;
 
 namespace StarterAssets
 {
-	using UnityEngine;
-
-	[RequireComponent(typeof(CharacterController))]
+    [RequireComponent(typeof(CharacterController))]
 #if ENABLE_INPUT_SYSTEM
-	[RequireComponent(typeof(PlayerInput))]
+    [RequireComponent(typeof(PlayerInput))]
 #endif
-	public class ThirdPersonController : MonoBehaviour
-	{
-		const float _threshold = 0.01f;
+    public class ThirdPersonController : MonoBehaviour
+    {
+        [Header("Player")]
+        [Tooltip("Move speed of the character in m/s")]
+        public float MoveSpeed = 2.0f;
 
-		[Header("Player")]
-		[Tooltip("Move speed of the character in m/s")]
-		public float MoveSpeed = 2.0f;
+        [Tooltip("Sprint speed of the character in m/s")]
+        public float SprintSpeed = 5.335f;
 
-		[Tooltip("Sprint speed of the character in m/s")]
-		public float SprintSpeed = 5.335f;
+        [Tooltip("How fast the character turns to face movement direction")]
+        [Range(0.0f, 0.3f)]
+        public float RotationSmoothTime = 0.12f;
 
-		[Tooltip("How fast the character turns to face movement direction")]
-		[Range(0.0f, 0.3f)]
-		public float RotationSmoothTime = 0.12f;
+        [Tooltip("Acceleration and deceleration")]
+        public float SpeedChangeRate = 10.0f;
 
-		[Tooltip("Acceleration and deceleration")]
-		public float SpeedChangeRate = 10.0f;
+        public AudioClip LandingAudioClip;
+        public AudioClip[] FootstepAudioClips;
+        [Range(0, 1)] public float FootstepAudioVolume = 0.5f;
 
-		public AudioClip LandingAudioClip;
-		public AudioClip[] FootstepAudioClips;
+        [Space(10)]
+        [Tooltip("The height the player can jump")]
+        public float JumpHeight = 1.2f;
 
-		[Range(0, 1)]
-		public float FootstepAudioVolume = 0.5f;
+        [Tooltip("The character uses its own gravity value. The engine default is -9.81f")]
+        public float Gravity = -15.0f;
 
-		[Space(10)]
-		[Tooltip("The height the player can jump")]
-		public float JumpHeight = 1.2f;
+        [Space(10)]
+        [Tooltip("Time required to pass before being able to jump again. Set to 0f to instantly jump again")]
+        public float JumpTimeout = 0.50f;
 
-		[Tooltip("The character uses its own gravity value. The engine default is -9.81f")]
-		public float Gravity = -15.0f;
+        [Tooltip("Time required to pass before entering the fall state. Useful for walking down stairs")]
+        public float FallTimeout = 0.15f;
 
-		[Space(10)]
-		[Tooltip(
-			"Time required to pass before being able to jump again. Set to 0f to instantly jump again"
-		)]
-		public float JumpTimeout = 0.50f;
+        [Header("Player Grounded")]
+        [Tooltip("If the character is grounded or not. Not part of the CharacterController built in grounded check")]
+        public bool Grounded = true;
 
-		[Tooltip(
-			"Time required to pass before entering the fall state. Useful for walking down stairs"
-		)]
-		public float FallTimeout = 0.15f;
+        [Tooltip("Useful for rough ground")]
+        public float GroundedOffset = -0.14f;
 
-		[Header("Player Grounded")]
-		[Tooltip(
-			"If the character is grounded or not. Not part of the CharacterController built in grounded check"
-		)]
-		public bool Grounded = true;
+        [Tooltip("The radius of the grounded check. Should match the radius of the CharacterController")]
+        public float GroundedRadius = 0.28f;
 
-		[Tooltip("Useful for rough ground")]
-		public float GroundedOffset = -0.14f;
+        [Tooltip("What layers the character uses as ground")]
+        public LayerMask GroundLayers;
 
-		[Tooltip(
-			"The radius of the grounded check. Should match the radius of the CharacterController"
-		)]
-		public float GroundedRadius = 0.28f;
+        [Header("Cinemachine")]
+        [Tooltip("The follow target set in the Cinemachine Virtual Camera that the camera will follow")]
+        public GameObject CinemachineCameraTarget;
 
-		[Tooltip("What layers the character uses as ground")]
-		public LayerMask GroundLayers;
+        [Tooltip("How far in degrees can you move the camera up")]
+        public float TopClamp = 70.0f;
 
-		[Header("Cinemachine")]
-		[Tooltip("The follow target set in the Cinemachine Virtual Camera that the camera will follow")]
-		public GameObject CinemachineCameraTarget;
+        [Tooltip("How far in degrees can you move the camera down")]
+        public float BottomClamp = -30.0f;
 
-		[Tooltip("How far in degrees can you move the camera up")]
-		public float TopClamp = 70.0f;
+        [Tooltip("Additional degress to override the camera. Useful for fine tuning camera position when locked")]
+        public float CameraAngleOverride = 0.0f;
 
-		[Tooltip("How far in degrees can you move the camera down")]
-		public float BottomClamp = -30.0f;
+        [Tooltip("For locking the camera position on all axis")]
+        public bool LockCameraPosition = false;
 
-		[Tooltip(
-			"Additional degress to override the camera. Useful for fine tuning camera position when locked"
-		)]
-		public float CameraAngleOverride;
+        // cinemachine
+        private float _cinemachineTargetYaw;
+        private float _cinemachineTargetPitch;
 
-		[Tooltip("For locking the camera position on all axis")]
-		public bool LockCameraPosition;
+        // player
+        private float _speed;
+        private float _animationBlend;
+        private float _targetRotation = 0.0f;
+        private float _rotationVelocity;
+        private float _verticalVelocity;
+        private float _terminalVelocity = 53.0f;
 
-		float _animationBlend;
-		Animator _animator;
-		int _animIDFreeFall;
-		int _animIDGrounded;
-		int _animIDJump;
-		int _animIDMotionSpeed;
+        // timeout deltatime
+        private float _jumpTimeoutDelta;
+        private float _fallTimeoutDelta;
 
-		// animation IDs
-		int _animIDSpeed;
-		float _cinemachineTargetPitch;
-
-		// cinemachine
-		float _cinemachineTargetYaw;
-		CharacterController _controller;
-		float _fallTimeoutDelta;
-
-		bool _hasAnimator;
-		StarterAssetsInputs _input;
-
-		// timeout deltatime
-		float _jumpTimeoutDelta;
-		GameObject _mainCamera;
+        // animation IDs
+        private int _animIDSpeed;
+        private int _animIDGrounded;
+        private int _animIDJump;
+        private int _animIDFreeFall;
+        private int _animIDMotionSpeed;
 
 #if ENABLE_INPUT_SYSTEM
-		PlayerInput _playerInput;
+        private PlayerInput _playerInput;
 #endif
-		float _rotationVelocity;
+        private Animator _animator;
+        private CharacterController _controller;
+        private StarterAssetsInputs _input;
+        private GameObject _mainCamera;
 
-		// player
-		float _speed;
-		float _targetRotation;
-		readonly float _terminalVelocity = 53.0f;
-		float _verticalVelocity;
+        private const float _threshold = 0.01f;
 
-		bool IsCurrentDeviceMouse
-		{
-			get
-			{
+        private bool _hasAnimator;
+
+        private bool IsCurrentDeviceMouse
+        {
+            get
+            {
 #if ENABLE_INPUT_SYSTEM
-				return _playerInput.currentControlScheme == "KeyboardMouse";
+                return _playerInput.currentControlScheme == "KeyboardMouse";
 #else
 				return false;
 #endif
-			}
-		}
+            }
+        }
 
-		void Awake()
-		{
-			// get a reference to our main camera
-			if (_mainCamera == null)
-				_mainCamera = GameObject.FindGameObjectWithTag("MainCamera");
-		}
 
-		void Start()
-		{
-			_cinemachineTargetYaw = CinemachineCameraTarget.transform.rotation.eulerAngles.y;
+        private void Awake()
+        {
+            // get a reference to our main camera
+            if (_mainCamera == null)
+            {
+                _mainCamera = GameObject.FindGameObjectWithTag("MainCamera");
+            }
+        }
 
-			_hasAnimator = TryGetComponent(out _animator);
-			_controller = GetComponent<CharacterController>();
-			_input = GetComponent<StarterAssetsInputs>();
+        private void Start()
+        {
+            _cinemachineTargetYaw = CinemachineCameraTarget.transform.rotation.eulerAngles.y;
+            
+            _hasAnimator = TryGetComponent(out _animator);
+            _controller = GetComponent<CharacterController>();
+            _input = GetComponent<StarterAssetsInputs>();
 #if ENABLE_INPUT_SYSTEM
-			_playerInput = GetComponent<PlayerInput>();
+            _playerInput = GetComponent<PlayerInput>();
 #else
-			Debug.LogError(
-				"Starter Assets package is missing dependencies. Please use Tools/Starter Assets/Reinstall Dependencies to fix it"
-			);
+			Debug.LogError( "Starter Assets package is missing dependencies. Please use Tools/Starter Assets/Reinstall Dependencies to fix it");
 #endif
 
-			AssignAnimationIDs();
+            AssignAnimationIDs();
 
-			// reset our timeouts on start
-			_jumpTimeoutDelta = JumpTimeout;
-			_fallTimeoutDelta = FallTimeout;
-		}
+            // reset our timeouts on start
+            _jumpTimeoutDelta = JumpTimeout;
+            _fallTimeoutDelta = FallTimeout;
+        }
 
-		void Update()
-		{
-			_hasAnimator = TryGetComponent(out _animator);
+        private void Update()
+        {
+            _hasAnimator = TryGetComponent(out _animator);
 
-			JumpAndGravity();
-			GroundedCheck();
-			Move();
-		}
+            JumpAndGravity();
+            GroundedCheck();
+            Move();
+        }
 
-		void LateUpdate()
-		{
-			CameraRotation();
-		}
+        private void LateUpdate()
+        {
+            CameraRotation();
+        }
 
-		void OnDrawGizmosSelected()
-		{
-			var transparentGreen = new Color(0.0f, 1.0f, 0.0f, 0.35f);
-			var transparentRed = new Color(1.0f, 0.0f, 0.0f, 0.35f);
+        private void AssignAnimationIDs()
+        {
+            _animIDSpeed = Animator.StringToHash("Speed");
+            _animIDGrounded = Animator.StringToHash("Grounded");
+            _animIDJump = Animator.StringToHash("Jump");
+            _animIDFreeFall = Animator.StringToHash("FreeFall");
+            _animIDMotionSpeed = Animator.StringToHash("MotionSpeed");
+        }
 
-			if (Grounded)
-				Gizmos.color = transparentGreen;
-			else
-				Gizmos.color = transparentRed;
+        private void GroundedCheck()
+        {
+            // set sphere position, with offset
+            Vector3 spherePosition = new Vector3(transform.position.x, transform.position.y - GroundedOffset,
+                transform.position.z);
+            Grounded = Physics.CheckSphere(spherePosition, GroundedRadius, GroundLayers,
+                QueryTriggerInteraction.Ignore);
 
-			// when selected, draw a gizmo in the position of, and matching radius of, the grounded collider
-			Gizmos.DrawSphere(
-				new Vector3(
-					transform.position.x,
-					transform.position.y - GroundedOffset,
-					transform.position.z
-				),
-				GroundedRadius
-			);
-		}
+            // update animator if using character
+            if (_hasAnimator)
+            {
+                _animator.SetBool(_animIDGrounded, Grounded);
+            }
+        }
 
-		void AssignAnimationIDs()
-		{
-			_animIDSpeed = Animator.StringToHash("Speed");
-			_animIDGrounded = Animator.StringToHash("Grounded");
-			_animIDJump = Animator.StringToHash("Jump");
-			_animIDFreeFall = Animator.StringToHash("FreeFall");
-			_animIDMotionSpeed = Animator.StringToHash("MotionSpeed");
-		}
+        private void CameraRotation()
+        {
+            // if there is an input and camera position is not fixed
+            if (_input.look.sqrMagnitude >= _threshold && !LockCameraPosition)
+            {
+                //Don't multiply mouse input by Time.deltaTime;
+                float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
 
-		void GroundedCheck()
-		{
-			// set sphere position, with offset
-			var spherePosition = new Vector3(
-				transform.position.x,
-				transform.position.y - GroundedOffset,
-				transform.position.z
-			);
-			Grounded = Physics.CheckSphere(
-				spherePosition,
-				GroundedRadius,
-				GroundLayers,
-				QueryTriggerInteraction.Ignore
-			);
+                _cinemachineTargetYaw += _input.look.x * deltaTimeMultiplier;
+                _cinemachineTargetPitch += _input.look.y * deltaTimeMultiplier;
+            }
 
-			// update animator if using character
-			if (_hasAnimator)
-				_animator.SetBool(_animIDGrounded, Grounded);
-		}
+            // clamp our rotations so our values are limited 360 degrees
+            _cinemachineTargetYaw = ClampAngle(_cinemachineTargetYaw, float.MinValue, float.MaxValue);
+            _cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, BottomClamp, TopClamp);
 
-		void CameraRotation()
-		{
-			// if there is an input and camera position is not fixed
-			if (_input.look.sqrMagnitude >= _threshold && !LockCameraPosition)
-			{
-				//Don't multiply mouse input by Time.deltaTime;
-				var deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
+            // Cinemachine will follow this target
+            CinemachineCameraTarget.transform.rotation = Quaternion.Euler(_cinemachineTargetPitch + CameraAngleOverride,
+                _cinemachineTargetYaw, 0.0f);
+        }
 
-				_cinemachineTargetYaw += _input.look.x * deltaTimeMultiplier;
-				_cinemachineTargetPitch += _input.look.y * deltaTimeMultiplier;
-			}
+        private void Move()
+        {
+            // set target speed based on move speed, sprint speed and if sprint is pressed
+            float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
 
-			// clamp our rotations so our values are limited 360 degrees
-			_cinemachineTargetYaw = ClampAngle(_cinemachineTargetYaw, float.MinValue, float.MaxValue);
-			_cinemachineTargetPitch = ClampAngle(_cinemachineTargetPitch, BottomClamp, TopClamp);
+            // a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
 
-			// Cinemachine will follow this target
-			CinemachineCameraTarget.transform.rotation = Quaternion.Euler(
-				_cinemachineTargetPitch + CameraAngleOverride,
-				_cinemachineTargetYaw,
-				0.0f
-			);
-		}
+            // note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
+            // if there is no input, set the target speed to 0
+            if (_input.move == Vector2.zero) targetSpeed = 0.0f;
 
-		void Move()
-		{
-			// set target speed based on move speed, sprint speed and if sprint is pressed
-			var targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
+            // a reference to the players current horizontal velocity
+            float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
 
-			// a simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
+            float speedOffset = 0.1f;
+            float inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
 
-			// note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-			// if there is no input, set the target speed to 0
-			if (_input.move == Vector2.zero)
-				targetSpeed = 0.0f;
+            // accelerate or decelerate to target speed
+            if (currentHorizontalSpeed < targetSpeed - speedOffset ||
+                currentHorizontalSpeed > targetSpeed + speedOffset)
+            {
+                // creates curved result rather than a linear one giving a more organic speed change
+                // note T in Lerp is clamped, so we don't need to clamp our speed
+                _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude,
+                    Time.deltaTime * SpeedChangeRate);
 
-			// a reference to the players current horizontal velocity
-			var currentHorizontalSpeed = new Vector3(
-				_controller.velocity.x,
-				0.0f,
-				_controller.velocity.z
-			).magnitude;
+                // round speed to 3 decimal places
+                _speed = Mathf.Round(_speed * 1000f) / 1000f;
+            }
+            else
+            {
+                _speed = targetSpeed;
+            }
 
-			var speedOffset = 0.1f;
-			var inputMagnitude = _input.analogMovement ? _input.move.magnitude : 1f;
+            _animationBlend = Mathf.Lerp(_animationBlend, targetSpeed, Time.deltaTime * SpeedChangeRate);
+            if (_animationBlend < 0.01f) _animationBlend = 0f;
 
-			// accelerate or decelerate to target speed
-			if (
-				currentHorizontalSpeed < targetSpeed - speedOffset
-				|| currentHorizontalSpeed > targetSpeed + speedOffset
-			)
-			{
-				// creates curved result rather than a linear one giving a more organic speed change
-				// note T in Lerp is clamped, so we don't need to clamp our speed
-				_speed = Mathf.Lerp(
-					currentHorizontalSpeed,
-					targetSpeed * inputMagnitude,
-					Time.deltaTime * SpeedChangeRate
-				);
+            // normalise input direction
+            Vector3 inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
 
-				// round speed to 3 decimal places
-				_speed = Mathf.Round(_speed * 1000f) / 1000f;
-			}
-			else
-			{
-				_speed = targetSpeed;
-			}
+            // note: Vector2's != operator uses approximation so is not floating point error prone, and is cheaper than magnitude
+            // if there is a move input rotate player when the player is moving
+            if (_input.move != Vector2.zero)
+            {
+                _targetRotation = Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg +
+                                  _mainCamera.transform.eulerAngles.y;
+                float rotation = Mathf.SmoothDampAngle(transform.eulerAngles.y, _targetRotation, ref _rotationVelocity,
+                    RotationSmoothTime);
 
-			_animationBlend = Mathf.Lerp(_animationBlend, targetSpeed, Time.deltaTime * SpeedChangeRate);
-			if (_animationBlend < 0.01f)
-				_animationBlend = 0f;
+                // rotate to face input direction relative to camera position
+                transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
+            }
 
-			// normalise input direction
-			var inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
 
-			// note: Vector2's != operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-			// if there is a move input rotate player when the player is moving
-			if (_input.move != Vector2.zero)
-			{
-				_targetRotation =
-					(Mathf.Atan2(inputDirection.x, inputDirection.z) * Mathf.Rad2Deg)
-					+ _mainCamera.transform.eulerAngles.y;
-				var rotation = Mathf.SmoothDampAngle(
-					transform.eulerAngles.y,
-					_targetRotation,
-					ref _rotationVelocity,
-					RotationSmoothTime
-				);
+            Vector3 targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
 
-				// rotate to face input direction relative to camera position
-				transform.rotation = Quaternion.Euler(0.0f, rotation, 0.0f);
-			}
+            // move the player
+            _controller.Move(targetDirection.normalized * (_speed * Time.deltaTime) +
+                             new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
 
-			var targetDirection = Quaternion.Euler(0.0f, _targetRotation, 0.0f) * Vector3.forward;
+            // update animator if using character
+            if (_hasAnimator)
+            {
+                _animator.SetFloat(_animIDSpeed, _animationBlend);
+                _animator.SetFloat(_animIDMotionSpeed, inputMagnitude);
+            }
+        }
 
-			// move the player
-			_controller.Move(
-				(targetDirection.normalized * (_speed * Time.deltaTime))
-					+ (new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime)
-			);
+        private void JumpAndGravity()
+        {
+            if (Grounded)
+            {
+                // reset the fall timeout timer
+                _fallTimeoutDelta = FallTimeout;
 
-			// update animator if using character
-			if (_hasAnimator)
-			{
-				_animator.SetFloat(_animIDSpeed, _animationBlend);
-				_animator.SetFloat(_animIDMotionSpeed, inputMagnitude);
-			}
-		}
+                // update animator if using character
+                if (_hasAnimator)
+                {
+                    _animator.SetBool(_animIDJump, false);
+                    _animator.SetBool(_animIDFreeFall, false);
+                }
 
-		void JumpAndGravity()
-		{
-			if (Grounded)
-			{
-				// reset the fall timeout timer
-				_fallTimeoutDelta = FallTimeout;
+                // stop our velocity dropping infinitely when grounded
+                if (_verticalVelocity < 0.0f)
+                {
+                    _verticalVelocity = -2f;
+                }
 
-				// update animator if using character
-				if (_hasAnimator)
-				{
-					_animator.SetBool(_animIDJump, false);
-					_animator.SetBool(_animIDFreeFall, false);
-				}
+                // Jump
+                if (_input.jump && _jumpTimeoutDelta <= 0.0f)
+                {
+                    // the square root of H * -2 * G = how much velocity needed to reach desired height
+                    _verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
 
-				// stop our velocity dropping infinitely when grounded
-				if (_verticalVelocity < 0.0f)
-					_verticalVelocity = -2f;
+                    // update animator if using character
+                    if (_hasAnimator)
+                    {
+                        _animator.SetBool(_animIDJump, true);
+                    }
+                }
 
-				// Jump
-				if (_input.jump && _jumpTimeoutDelta <= 0.0f)
-				{
-					// the square root of H * -2 * G = how much velocity needed to reach desired height
-					_verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
+                // jump timeout
+                if (_jumpTimeoutDelta >= 0.0f)
+                {
+                    _jumpTimeoutDelta -= Time.deltaTime;
+                }
+            }
+            else
+            {
+                // reset the jump timeout timer
+                _jumpTimeoutDelta = JumpTimeout;
 
-					// update animator if using character
-					if (_hasAnimator)
-						_animator.SetBool(_animIDJump, true);
-				}
+                // fall timeout
+                if (_fallTimeoutDelta >= 0.0f)
+                {
+                    _fallTimeoutDelta -= Time.deltaTime;
+                }
+                else
+                {
+                    // update animator if using character
+                    if (_hasAnimator)
+                    {
+                        _animator.SetBool(_animIDFreeFall, true);
+                    }
+                }
 
-				// jump timeout
-				if (_jumpTimeoutDelta >= 0.0f)
-					_jumpTimeoutDelta -= Time.deltaTime;
-			}
-			else
-			{
-				// reset the jump timeout timer
-				_jumpTimeoutDelta = JumpTimeout;
+                // if we are not grounded, do not jump
+                _input.jump = false;
+            }
 
-				// fall timeout
-				if (_fallTimeoutDelta >= 0.0f)
-				{
-					_fallTimeoutDelta -= Time.deltaTime;
-				}
-				else
-				{
-					// update animator if using character
-					if (_hasAnimator)
-						_animator.SetBool(_animIDFreeFall, true);
-				}
+            // apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
+            if (_verticalVelocity < _terminalVelocity)
+            {
+                _verticalVelocity += Gravity * Time.deltaTime;
+            }
+        }
 
-				// if we are not grounded, do not jump
-				_input.jump = false;
-			}
+        private static float ClampAngle(float lfAngle, float lfMin, float lfMax)
+        {
+            if (lfAngle < -360f) lfAngle += 360f;
+            if (lfAngle > 360f) lfAngle -= 360f;
+            return Mathf.Clamp(lfAngle, lfMin, lfMax);
+        }
 
-			// apply gravity over time if under terminal (multiply by delta time twice to linearly speed up over time)
-			if (_verticalVelocity < _terminalVelocity)
-				_verticalVelocity += Gravity * Time.deltaTime;
-		}
+        private void OnDrawGizmosSelected()
+        {
+            Color transparentGreen = new Color(0.0f, 1.0f, 0.0f, 0.35f);
+            Color transparentRed = new Color(1.0f, 0.0f, 0.0f, 0.35f);
 
-		static float ClampAngle(float lfAngle, float lfMin, float lfMax)
-		{
-			if (lfAngle < -360f)
-				lfAngle += 360f;
-			if (lfAngle > 360f)
-				lfAngle -= 360f;
-			return Mathf.Clamp(lfAngle, lfMin, lfMax);
-		}
+            if (Grounded) Gizmos.color = transparentGreen;
+            else Gizmos.color = transparentRed;
 
-		void OnFootstep(AnimationEvent animationEvent)
-		{
-			if (animationEvent.animatorClipInfo.weight > 0.5f)
-				if (FootstepAudioClips.Length > 0)
-				{
-					var index = Random.Range(0, FootstepAudioClips.Length);
-					AudioSource.PlayClipAtPoint(
-						FootstepAudioClips[index],
-						transform.TransformPoint(_controller.center),
-						FootstepAudioVolume
-					);
-				}
-		}
+            // when selected, draw a gizmo in the position of, and matching radius of, the grounded collider
+            Gizmos.DrawSphere(
+                new Vector3(transform.position.x, transform.position.y - GroundedOffset, transform.position.z),
+                GroundedRadius);
+        }
 
-		void OnLand(AnimationEvent animationEvent)
-		{
-			if (animationEvent.animatorClipInfo.weight > 0.5f)
-				AudioSource.PlayClipAtPoint(
-					LandingAudioClip,
-					transform.TransformPoint(_controller.center),
-					FootstepAudioVolume
-				);
-		}
-	}
+        private void OnFootstep(AnimationEvent animationEvent)
+        {
+            if (animationEvent.animatorClipInfo.weight > 0.5f)
+            {
+                if (FootstepAudioClips.Length > 0)
+                {
+                    var index = Random.Range(0, FootstepAudioClips.Length);
+                    AudioSource.PlayClipAtPoint(FootstepAudioClips[index], transform.TransformPoint(_controller.center), FootstepAudioVolume);
+                }
+            }
+        }
+
+        private void OnLand(AnimationEvent animationEvent)
+        {
+            if (animationEvent.animatorClipInfo.weight > 0.5f)
+            {
+                AudioSource.PlayClipAtPoint(LandingAudioClip, transform.TransformPoint(_controller.center), FootstepAudioVolume);
+            }
+        }
+    }
 }

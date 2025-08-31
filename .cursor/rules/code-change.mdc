@@ -1,5 +1,4 @@
 ---
-# globs: crates/**,docs/**
 alwaysApply: false
 ---
 ## Code Change Protocol
@@ -50,14 +49,14 @@ Brief overview of what will be changed and why.
 ### Detailed Changes
 
 #### 1. [Component/File Name]
-- **Location**: `path/to/file.rs`
+- **Location**: `path/to/file.cs`
 - **Changes**: 
   - Modify function X to...
   - Add new struct Y for...
 - **Rationale**: This change improves...
 
 #### 2. [Another Component]
-- **Location**: `path/to/another_file.rs`
+- **Location**: `path/to/another_file.cs`
 - **Changes**: 
   - Refactor module to...
 - **Rationale**: This enables...
@@ -75,10 +74,10 @@ Brief overview of what will be changed and why.
 
 ## Project-Specific Guidelines
 
-1. **Rust Code Changes**:
-   - Consider impact on both library crates and demo app
-   - Note any changes to public APIs
-   - Consider performance implications for voxel operations
+1. **C# Code Changes (Unity)**:
+   - Consider impact on assemblies (`.asmdef`) and runtime/editor split
+   - Note any changes to public APIs and serialized fields (scene/prefab compatibility)
+   - Consider performance implications for jobs/burst and allocations
 
 2. **Asset and Shader Changes**:
    - Document any changes to asset pipeline
@@ -86,5 +85,6 @@ Brief overview of what will be changed and why.
 
 3. **Architecture Changes**:
    - Update architecture diagrams in docs/
-   - Consider domain-driven design principles
-   - Maintain clean separation between app/, domain/, and infra/ layers
+   - Consider domain-oriented programming principles
+   - Maintain clear separation between bootstraps (MonoBehaviours), pure services, and DOTS systems
+   - Keep UnityEngine API at edges; core logic uses `Unity.Mathematics` and unmanaged types when possible

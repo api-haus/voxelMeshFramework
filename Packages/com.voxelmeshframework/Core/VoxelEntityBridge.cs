@@ -9,9 +9,12 @@ namespace Voxels.Core
 	using Procedural;
 	using Procedural.Tags;
 	using Unity.Entities;
+	using Unity.Mathematics.Geometry;
 	using Unity.Transforms;
 	using UnityEngine;
+	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Mathematics.math;
+	using static VoxelConstants;
 
 	static class VoxelEntityBridge
 	{
@@ -25,12 +28,14 @@ namespace Voxels.Core
 			Transform attachTransform = null
 		)
 		{
+			using var _ = VoxelEntityBridge_CreateMeshEntity.Auto();
 			List<ComponentType> types = new(
 				new ComponentType[]
 				{
 					typeof(EntityGameObjectInstanceIDAttachment),
 					typeof(NativeVoxelObject),
 					typeof(NativeVoxelMesh.Request),
+					typeof(VoxelMeshingAlgorithmComponent),
 					typeof(NeedsManagedMeshUpdate),
 					typeof(NeedsSpatialUpdate),
 					typeof(NeedsRemesh),
@@ -68,6 +73,7 @@ namespace Voxels.Core
 				{
 					//
 					voxelSize = vm.voxelSize,
+					localBounds = new MinMaxAABB(0, EFFECTIVE_CHUNK_SIZE * vm.voxelSize),
 				}
 			);
 			EntityManager.SetComponentData(
@@ -76,6 +82,19 @@ namespace Voxels.Core
 				{
 					//
 					voxelSize = vm.voxelSize,
+				}
+			);
+			EntityManager.SetComponentData(
+				ent,
+				new VoxelMeshingAlgorithmComponent
+				{
+					algorithm = vm.meshingAlgorithm,
+					enableFairing = vm.enableFairing,
+					fairingIterations = vm.fairingIterations,
+					fairingStepSize = vm.fairingStepSize,
+					cellMargin = vm.cellMargin,
+					recomputeNormalsAfterFairing = vm.recomputeNormalsAfterFairing,
+					materialDistributionMode = vm.materialDistributionMode,
 				}
 			);
 
@@ -117,6 +136,7 @@ namespace Voxels.Core
 			Transform attachTransform = null
 		)
 		{
+			using var _ = VoxelEntityBridge_CreateGridEntity.Auto();
 			List<ComponentType> types = new(
 				new ComponentType[]
 				{
@@ -188,7 +208,7 @@ namespace Voxels.Core
 		{
 			if (EntityManager.Equals(default))
 				return;
-
+			using var _ = VoxelEntityBridge_DestroyByInstanceID.Auto();
 			var entity = EntityManager.CreateEntity(typeof(DestroyEntityByInstanceIDEvent));
 
 			EntityManager.SetComponentData(
@@ -201,6 +221,7 @@ namespace Voxels.Core
 		{
 			if (EntityManager.Equals(default))
 				return;
+			using var _ = VoxelEntityBridge_DestroyEntity.Auto();
 			EntityManager.DestroyEntity(ent);
 		}
 	}

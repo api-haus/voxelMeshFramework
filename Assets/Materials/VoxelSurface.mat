@@ -21,18 +21,20 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: VoxelSurface
-  m_Shader: {fileID: -6465566751694194690, guid: b6758e2312efe41a684cc7a9bcd13f41, type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 68aabf6cb59d8432a81e86ba15659ccf, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _USE_VERTEX_DISPLACEMENT
+  - _TEX_SAMPLE_TWO
+  - _USE_PARALLAX
   m_InvalidKeywords:
-  - _USE_POM
-  - _VERTEXDISP
+  - _BUILTIN_ALPHATEST_ON
+  - _BUILTIN_AlphaClip
+  - _PARALLAX
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
+  m_CustomRenderQueue: 2450
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
@@ -129,8 +131,19 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
     - _AlphaToMask: 0
+    - _BUILTIN_AlphaClip: 1
+    - _BUILTIN_Blend: 0
+    - _BUILTIN_CullMode: 2
+    - _BUILTIN_DstBlend: 0
+    - _BUILTIN_QueueControl: 0
+    - _BUILTIN_QueueOffset: 0
+    - _BUILTIN_SrcBlend: 1
+    - _BUILTIN_Surface: 0
+    - _BUILTIN_ZTest: 4
+    - _BUILTIN_ZWrite: 1
+    - _BUILTIN_ZWriteControl: 0
     - _Blend: 0
-    - _BlendContrast: 1
+    - _BlendContrast: 8
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
     - _Channel: 0
@@ -150,36 +163,61 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
+    - _MaterialContrast: 7
     - _Metallic: 0
     - _NormalScale: 1
-    - _NormalStrength: 1.51
+    - _NormalStrength: 2
     - _OcclusionStrength: 1
+    - _PARALLAX: 1
     - _POMSteps: 3
-    - _Parallax: 0.0562
-    - _QueueControl: -1
+    - _Parallax: 0.1
+    - _QueueControl: 1
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _SeamIntensity: 1
+    - _SeamWidth: 0
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
+    - _TEX_SAMPLE: 1
+    - _TransitionSharpness: 18.41
+    - _USE_DEBUG_WEIGHTS: 0
+    - _USE_PARALLAX: 1
     - _UVScale: 1
-    - _UseBiplanar: 0
+    - _UseBiplanar: 1
     - _UseFresnel: 0
     - _UseMaskMap: 0
     - _UsePOM: 1
     - _UseParallax: 0
+    - _UseSeam: 0
     - _VertexDisplacement: 1
-    - _VertexDisplacementStrength: 0.35
+    - _VertexDisplacementOffset: 0.266
+    - _VertexDisplacementStrength: 0.086
     - _WorkflowMode: 1
+    - _XRMotionVectorsPass: 1
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _SeamColor: {r: 1, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _Tint: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
+--- !u!114 &7253277774572144206
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 639247ca83abc874e893eb93af2b5e44, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.ShaderGraph.Editor::UnityEditor.Rendering.BuiltIn.AssetVersion
+  version: 0

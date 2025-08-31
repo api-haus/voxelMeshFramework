@@ -1,6 +1,8 @@
 namespace Voxels.Core.Spatial
 {
 	using System;
+	using Authoring;
+	using Debugging;
 	using Grids;
 	using Meshing;
 	using Meshing.Tags;
@@ -10,10 +12,14 @@ namespace Voxels.Core.Spatial
 	using Unity.Mathematics;
 	using Unity.Mathematics.Geometry;
 	using Unity.Transforms;
+	using UnityEngine;
+	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
+	using static Unity.Mathematics.Geometry.Math;
 	using static Unity.Mathematics.math;
 	using static VoxelConstants;
 	using EndInitST = Unity.Entities.EndInitializationEntityCommandBufferSystem.Singleton;
+	using float4x4 = Unity.Mathematics.float4x4;
 
 	[UpdateInGroup(typeof(InitializationSystemGroup))]
 	public partial struct VoxelSpatialSystem : ISystem
@@ -47,6 +53,7 @@ namespace Voxels.Core.Spatial
 		[BurstCompile]
 		public void OnUpdate(ref SystemState state)
 		{
+			using var _ = VoxelSpatialSystem_Update.Auto();
 			var ecb = GetSingleton<EndInitST>().CreateCommandBuffer(state.WorldUnmanaged);
 
 			ref var st = ref GetSingletonRW<VoxelObjectHash>().ValueRW;
@@ -66,10 +73,12 @@ namespace Voxels.Core.Spatial
 				st.Add(
 					new SpatialVoxelObject
 					{
-						voxelData = new(voxelMeshRef.ValueRO),
-						bounds = chunkRef.ValueRO.bounds,
 						entity = entity,
+						voxelData = new(voxelMeshRef.ValueRO),
+						localBounds = chunkRef.ValueRO.localBounds,
 						voxelSize = chunkRef.ValueRO.voxelSize,
+						ltw = float4x4.identity, // todo
+						wtl = float4x4.identity,
 					}
 				);
 
@@ -87,16 +96,18 @@ namespace Voxels.Core.Spatial
 					.WithAll<NeedsSpatialUpdate>()
 			)
 			{
-				var position = ltwRef.ValueRO.Position;
-				var bounds = objectRef.ValueRO.Bounds(position);
+				ref readonly var obj = ref objectRef.ValueRO;
+				ref readonly var ltw = ref ltwRef.ValueRO;
 
 				st.Add(
 					new SpatialVoxelObject
 					{
-						voxelData = new(voxelMeshRef.ValueRO),
-						bounds = bounds,
 						entity = entity,
-						voxelSize = objectRef.ValueRO.voxelSize,
+						voxelData = new(voxelMeshRef.ValueRO),
+						localBounds = obj.localBounds,
+						voxelSize = obj.voxelSize,
+						ltw = ltw.Value,
+						wtl = inverse(ltw.Value),
 					}
 				);
 
@@ -110,30 +121,69 @@ namespace Voxels.Core.Spatial
 
 			public NativeParallelMultiHashMap<int3, SpatialVoxelObject> hash;
 
-			public void Add(SpatialVoxelObject svo)
+			public void Add(SpatialVoxelObject s)
 			{
-				var cellMin = (int3)floor(svo.bounds.Min / s_cellSize);
-				var cellMax = (int3)ceil(svo.bounds.Max / s_cellSize);
+				// Compute world-space AABB correctly for arbitrary rotations and scales
+				var worldBounds = Transform(s.ltw, s.localBounds);
+
+				var cellMin = (int3)floor(worldBounds.Min / s_cellSize);
+				var cellMax = (int3)ceil(worldBounds.Max / s_cellSize);
 
 				for (var x = cellMin.x; x <= cellMax.x; x++)
 				for (var y = cellMin.y; y <= cellMax.y; y++)
 				for (var z = cellMin.z; z <= cellMax.z; z++)
-					hash.Add(new int3(x, y, z), svo);
+				{
+					hash.Add(new int3(x, y, z), s);
+
+#if ALINE && DEBUG
+					if (VoxelDebugging.IsEnabled)
+					{
+						var min = new int3(x, y, z) * s_cellSize;
+						var max = min + s_cellSize;
+
+						var b = new MinMaxAABB(min, max);
+
+						Visual.Draw.PushDuration(.33f);
+						Visual.Draw.WireBox(b.Center, b.Extents, Color.blue);
+						Visual.Draw.PopDuration();
+					}
+#endif
+				}
+
+#if ALINE && DEBUG
+				if (VoxelDebugging.IsEnabled)
+				{
+					Visual.Draw.PushDuration(.33f);
+					Visual.Draw.WireBox(worldBounds.Center, worldBounds.Extents * 1.01f, Color.green);
+
+					Visual.Draw.PushMatrix(s.ltw);
+					Visual.Draw.WireBox(s.localBounds.Center, s.localBounds.Extents * 1.03f, Color.red);
+					Visual.Draw.PopMatrix();
+					Visual.Draw.PopDuration();
+				}
+#endif
 			}
 
 			public NativeArray<SpatialVoxelObject> Query(
-				MinMaxAABB bounds,
+				MinMaxAABB queryWorldBounds,
 				Allocator allocator = Allocator.TempJob
 			)
 			{
-				var cell = (int3)floor(bounds.Center / s_cellSize);
+				using var _ = VoxelSpatialSystem_Query.Auto();
+
+				var cell = (int3)floor(queryWorldBounds.Center / s_cellSize);
 
 				using var values = hash.GetValuesForKey(cell);
 
 				NativeList<SpatialVoxelObject> list = new(1, allocator);
 				foreach (var spatialVoxelObject in values)
-					if (spatialVoxelObject.bounds.Overlaps(bounds))
+				{
+					var localObjectBounds = spatialVoxelObject.localBounds;
+					var localQueryBounds = Transform(spatialVoxelObject.wtl, queryWorldBounds);
+
+					if (localObjectBounds.Overlaps(localQueryBounds))
 						list.Add(spatialVoxelObject);
+				}
 
 				return list.AsArray();
 			}

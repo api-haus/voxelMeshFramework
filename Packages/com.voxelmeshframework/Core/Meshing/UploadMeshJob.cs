@@ -9,6 +9,7 @@ namespace Voxels.Core.Meshing
 	using Unity.Mathematics.Geometry;
 	using UnityEngine;
 	using UnityEngine.Rendering;
+	using static Diagnostics.VoxelProfiler.Marks;
 	using static SharedStaticMeshingResources;
 	using static UnityEngine.Rendering.MeshUpdateFlags;
 
@@ -28,6 +29,8 @@ namespace Voxels.Core.Meshing
 
 		public void Execute()
 		{
+			using var _ = VoxelMeshingSystem_Upload.Auto();
+
 			var md = mda[0];
 
 			md.SetVertexBufferParams(vertices.Length, VertexAttributes);

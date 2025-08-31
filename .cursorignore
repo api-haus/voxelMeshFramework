@@ -1,4 +1,5 @@
-Assets/
+Assets/*
+!Assets/Shaders
 Packages/com.jbooth*
 ProjectSettings/
 
@@ -13,3 +14,4 @@ Library/PackageCache/*
 !Library/PackageCache/com.unity.inputsystem*
 !Library/PackageCache/com.unity.cinemachine*
 !Library/PackageCache/com.unity.test-framework*
+!*.pdf

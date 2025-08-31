@@ -1,7 +1,7 @@
 ---
-alwaysApply: true
+globs: *.cs
+alwaysApply: false
 ---
-
 This project is built with Unity game engine, written in C#.
 
 Follow this formatting convention:

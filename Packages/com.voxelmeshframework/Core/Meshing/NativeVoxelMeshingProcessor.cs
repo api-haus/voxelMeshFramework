@@ -4,17 +4,19 @@ namespace Voxels.Core.Meshing
 	using ThirdParty.SurfaceNets.Extensions;
 	using Unity.Jobs;
 	using UnityEngine;
+	using static Diagnostics.VoxelProfiler.Marks;
 	using static UnityEngine.Rendering.MeshUpdateFlags;
 
 	public static class NativeVoxelMeshingProcessor
 	{
 		public static JobHandle ScheduleMeshing(ref this NativeVoxelMesh nvm, JobHandle inputDeps)
 		{
-			inputDeps = new MesherJob
+			using var _ = NativeVoxelMeshingProcessor_Schedule.Auto();
+			// Use NaiveSurfaceNets directly for now
+			inputDeps = new NaiveSurfaceNets
 			{
 				edgeTable = SharedStaticMeshingResources.EdgeTable,
 				volume = nvm.volume.sdfVolume,
-				materials = nvm.volume.materials,
 				buffer = nvm.meshing.buffer,
 				indices = nvm.meshing.indices,
 				vertices = nvm.meshing.vertices,
@@ -36,6 +38,7 @@ namespace Voxels.Core.Meshing
 
 		public static void ApplyMeshManaged(ref this NativeVoxelMesh nvm)
 		{
+			using var _ = NativeVoxelMeshingProcessor_Apply.Auto();
 			if (!nvm.meshing.meshRef)
 				nvm.meshing.meshRef = new Mesh();
 

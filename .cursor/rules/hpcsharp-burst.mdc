@@ -1,8 +1,7 @@
 ---
-globs: *.cs
+description: Developing gameplay systems, systems design
 alwaysApply: false
 ---
-
 ### HPC# and Burst Compiler Rule (Unity/C#)
 
 Maximize performance by constraining hot paths to HPC# and enabling Burst on strictly static entrypoints with unmanaged data only.

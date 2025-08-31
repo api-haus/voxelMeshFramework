@@ -1,5 +1,4 @@
 ---
-globs: *.cs
 alwaysApply: false
 ---
 ### C# Script File and Class Naming Rule

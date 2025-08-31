@@ -3,6 +3,7 @@ namespace Voxels.Core.Meshing.Systems
 	using Unity.Burst;
 	using Unity.Collections;
 	using Unity.Entities;
+	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using EndInitST = Unity.Entities.EndInitializationEntityCommandBufferSystem.Singleton;
 
@@ -29,6 +30,8 @@ namespace Voxels.Core.Meshing.Systems
 		[BurstCompile]
 		public void OnUpdate(ref SystemState state)
 		{
+			using var _ = VoxelMeshAllocationSystem_Update.Auto();
+
 			var ecb = GetSingleton<EndInitST>().CreateCommandBuffer(state.WorldUnmanaged);
 
 			// allocate
@@ -37,13 +40,12 @@ namespace Voxels.Core.Meshing.Systems
 					.WithNone<NativeVoxelMesh>()
 					.WithEntityAccess()
 			)
-			{
-				var nvm = new NativeVoxelMesh(Allocator.Persistent);
-
-				nvm.volume.voxelSize = req.ValueRO.voxelSize;
-
-				ecb.AddComponent(entity, nvm);
-			}
+				using (VoxelMeshAllocationSystem_Allocate.Auto())
+				{
+					var nvm = new NativeVoxelMesh(Allocator.Persistent);
+					nvm.volume.voxelSize = req.ValueRO.voxelSize;
+					ecb.AddComponent(entity, nvm);
+				}
 
 			// cleanup
 			foreach (
@@ -51,12 +53,12 @@ namespace Voxels.Core.Meshing.Systems
 					.WithNone<NativeVoxelMesh.Request>()
 					.WithEntityAccess()
 			)
-			{
-				// dispose
-				state.Dependency = nativeVoxelMesh.ValueRW.Dispose(state.Dependency);
-
-				ecb.RemoveComponent<NativeVoxelMesh>(entity);
-			}
+				using (VoxelMeshAllocationSystem_Cleanup.Auto())
+				{
+					// dispose
+					nativeVoxelMesh.ValueRW.Dispose();
+					ecb.RemoveComponent<NativeVoxelMesh>(entity);
+				}
 		}
 	}
 }

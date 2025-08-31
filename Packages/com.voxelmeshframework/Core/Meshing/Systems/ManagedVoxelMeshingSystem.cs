@@ -4,6 +4,7 @@ namespace Voxels.Core.Meshing.Systems
 	using Tags;
 	using Unity.Burst;
 	using Unity.Entities;
+	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 
@@ -14,6 +15,8 @@ namespace Voxels.Core.Meshing.Systems
 		[BurstDiscard]
 		protected override void OnUpdate()
 		{
+			using var _ = ManagedVoxelMeshingSystem_Update.Auto();
+
 			var ecb = SystemAPI.GetSingleton<EndSimST>().CreateCommandBuffer(World.Unmanaged);
 
 			// apply managed mesh
@@ -22,13 +25,12 @@ namespace Voxels.Core.Meshing.Systems
 					.WithAll<NeedsManagedMeshUpdate>()
 					.WithEntityAccess()
 			)
-			{
-				ref var nvm = ref nativeVoxelMeshRef.ValueRW;
-
-				nvm.ApplyMeshManaged();
-
-				ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(entity, false);
-			}
+				using (ManagedVoxelMeshingSystem_ApplyMesh.Auto())
+				{
+					ref var nvm = ref nativeVoxelMeshRef.ValueRW;
+					nvm.ApplyMeshManaged();
+					ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(entity, false);
+				}
 
 			// attach w/ mesh filter
 			foreach (
@@ -38,14 +40,13 @@ namespace Voxels.Core.Meshing.Systems
 				>()
 					.WithAll<NeedsManagedMeshUpdate>()
 			)
-			{
-				ref var nvm = ref nativeVoxelMeshRef.ValueRW;
-
-				var indexCount = nvm.meshing.indices.Length;
-				var hasMesh = indexCount > 16;
-
-				meshFilterAttachment.attachTo.sharedMesh = hasMesh ? nvm.meshing.meshRef : null;
-			}
+				using (ManagedVoxelMeshingSystem_AttachMeshFilter.Auto())
+				{
+					ref var nvm = ref nativeVoxelMeshRef.ValueRW;
+					var indexCount = nvm.meshing.indices.Length;
+					var hasMesh = indexCount > 16;
+					meshFilterAttachment.attachTo.sharedMesh = hasMesh ? nvm.meshing.meshRef : null;
+				}
 
 			// attach w/ mesh collider
 			foreach (
@@ -55,15 +56,14 @@ namespace Voxels.Core.Meshing.Systems
 				>()
 					.WithAll<NeedsManagedMeshUpdate>()
 			)
-			{
-				ref var nvm = ref nativeVoxelMeshRef.ValueRW;
-
-				var indexCount = nvm.meshing.indices.Length;
-				var hasMesh = indexCount > 16;
-
-				meshColliderAttachment.attachTo.sharedMesh = hasMesh ? nvm.meshing.meshRef : null;
-				meshColliderAttachment.attachTo.enabled = hasMesh;
-			}
+				using (ManagedVoxelMeshingSystem_AttachMeshCollider.Auto())
+				{
+					ref var nvm = ref nativeVoxelMeshRef.ValueRW;
+					var indexCount = nvm.meshing.indices.Length;
+					var hasMesh = indexCount > 16;
+					meshColliderAttachment.attachTo.sharedMesh = hasMesh ? nvm.meshing.meshRef : null;
+					meshColliderAttachment.attachTo.enabled = hasMesh;
+				}
 		}
 	}
 }

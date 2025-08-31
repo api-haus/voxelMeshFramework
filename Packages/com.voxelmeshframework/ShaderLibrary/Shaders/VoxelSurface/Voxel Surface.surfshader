@@ -1,0 +1,139 @@
+// This shader implements discrete material assignment following the SurfaceNets paper:
+// - Vertex Color R: Material ID (0-255) - each vertex assigned to dominant material
+// - Vertex Color G: Reserved for future use
+// - Vertex Color B: Reserved for future use
+// - No material blending - sharp boundaries between materials
+// - Following "SurfaceNets for Multi-Label Segmentations" approach
+
+BEGIN_OPTIONS
+//ShaderTarget "5.0"
+END_OPTIONS
+
+BEGIN_PROPERTIES
+[BetterHeader(PBR)]
+[NoScaleOffset] _Diffuse("Albedo&Height", 2DArray) = "white" {}                     //
+[NoScaleOffset] _NormalSAO("Normal&Smooth&AO", 2DArray) = "bump" {}                    //
+[NoScaleOffset] _EmissiveMetallic("Emissive&Metallic", 2DArray) = "black" {}                    //
+_NormalStrength("Normal Strength", Float) = 1.0                              //
+_EmissiveStrength("Emissive Strength", Float) = 1.0                              //
+[BetterHeader(Effects)]  //
+[Toggle(_USE_FRESNEL)] _UseFresnel("Fresnel", Float) = 0  //
+_FresnelPower("Fresnel Power", Range(0.5,16)) = 1.0                                            //
+_FresnelStrength("Fresnel Strength", Range(0.01,2)) = 1.0                                            //
+[BetterHeader(Sampling)]  //
+[Toggle(_USE_BIPLANAR)] _UseBiplanar("Biplanar (on) Triplanar (off)", Float) = 0  //
+_UVScale("UV Scale", Float) = 1.0                                             //
+_BlendContrast("Blend Contrast", Range(0.5,8)) = 1.0                                            //
+[BetterHeader(Displacement)]
+[Toggle(_USE_VERTEX_DISPLACEMENT)] _VertexDisplacement("Vertex Displacement", Float) = 0  //
+_VertexDisplacementStrength("Vertex Displacement Strength", Range(0,2.0)) = 1.0                                            //
+_VertexDisplacementOffset("Vertex Displacement Offset", Range(0,2.0)) = 1.0                                            //
+[Toggle(_USE_PARALLAX)] _UseParallax("Parallax", Float) = 0  //
+_Parallax("Scale", Range(0.005, 0.08)) = 0.005
+END_PROPERTIES
+
+BEGIN_CBUFFER
+half _NormalStrength;
+half _EmissiveStrength;
+half _FresnelPower;
+half _FresnelStrength;
+half _UVScale;
+half _BlendContrast;
+half _VertexDisplacementStrength;
+half _VertexDisplacementOffset;
+half _Parallax;
+END_CBUFFER
+
+BEGIN_DEFINES
+#pragma shader_feature_local _ _USE_VERTEX_DISPLACEMENT
+#pragma shader_feature_local _ _USE_PARALLAX
+#pragma shader_feature_local _ _USE_FRESNEL
+#pragma shader_feature_local _ _USE_BIPLANAR
+#define _WORLDSPACENORMAL 1
+END_DEFINES
+
+BEGIN_CODE
+TEXTURE2D_ARRAY(_Diffuse);
+SAMPLER(sampler_Diffuse);
+TEXTURE2D_ARRAY(_NormalSAO);
+SAMPLER(sampler_NormalSAO);
+TEXTURE2D_ARRAY(_EmissiveMetallic);
+
+#if _USE_BIPLANAR
+#include "./Biplanar.hlsl"
+#define kSampler BiplanarTextureArraySampler
+#else
+#include "./Triplanar.hlsl"
+#define kSampler TriplanarTextureArraySampler
+#endif
+
+#include "./Parallax.hlsl"
+
+void ModifyVertex(inout VertexData v, inout ExtraV2F d)
+{
+#if _USE_VERTEX_DISPLACEMENT
+  kSampler s = (kSampler)0;
+
+  // Get material ID from vertex color (discrete material assignment)
+  int materialId = (int)(v.vertexColor.r * 255.0);
+
+  s.gatherLOD(v.normal,TransformObjectToWorld(v.vertex));
+  
+  // Sample height from the material
+  half height = s.sampleHeightLOD(materialId, 0, _Diffuse, sampler_Diffuse);
+  
+  v.vertex.xyz += v.normal * (height - .5 + _VertexDisplacementOffset) * _VertexDisplacementStrength;
+
+  // Pass along tangent for normal mapping calculations
+  d.extraV2F0 = v.tangent;
+#endif
+}
+
+void SurfaceFunction(inout Surface o, ShaderData d) {
+  kSampler s = (kSampler)0;
+
+  s.gather(d.worldSpaceNormal, d.worldSpacePosition);
+
+  // Get material ID from vertex color (discrete material assignment)
+  float materialId = (d.vertexColor.r * 255.0);
+
+  // Sample material textures
+  half4 albedoHeight = s.sample(materialId, _Diffuse, sampler_Diffuse);
+  o.Height = albedoHeight.a;
+
+#if _USE_PARALLAX
+  // Apply parallax offset
+  half2 offset = ParallaxOffsetT(o.Height, _Parallax, d.tangentSpaceViewDir);
+  s.offset(offset);
+  
+  // Re-sample with parallax offset
+  albedoHeight = s.sample(materialId, _Diffuse, sampler_Diffuse);
+  o.Height = albedoHeight.a;
+#endif
+
+  // Set albedo
+  o.Albedo = albedoHeight.rgb;
+
+  // Sample normal, smoothness, and AO
+  half3 normal;
+  half smoothness;
+  half ao;
+  
+  s.sampleNormal(d.worldSpaceNormal, materialId, _NormalSAO, sampler_NormalSAO,
+                 normal, smoothness, ao);
+  
+  o.Normal = normal;
+  o.Smoothness = smoothness;
+  o.Occlusion = ao;
+
+  // Sample emissive/metallic
+  half4 emissiveMetal = s.sample(materialId, _EmissiveMetallic, sampler_Diffuse);
+  o.Metallic = emissiveMetal.a;
+  o.Emission = emissiveMetal.rgb * _EmissiveStrength;
+
+#if _USE_FRESNEL
+  o.Albedo += o.Albedo * pow((1.0 - saturate(dot(d.worldSpaceNormal, d.worldSpaceViewDir))), _FresnelPower) * _FresnelStrength;
+#endif
+}
+
+END_CODE
