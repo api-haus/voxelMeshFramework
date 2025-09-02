@@ -19,9 +19,9 @@ namespace Voxels.Core.Meshing
 			ref s_sharedStatic.Data.vertexAttributes;
 
 		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-		internal static void Init()
+		internal static void Initialize()
 		{
-			using var _ = SharedStaticMeshingResources_Init.Auto();
+			using var _ = SharedStaticMeshingResources_Initialize.Auto();
 
 			if (!EdgeTable.IsCreated)
 			{

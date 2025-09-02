@@ -5,6 +5,7 @@
 - Surface Nets implementation operates on 32×32×32 voxel volumes with a 1-voxel apron, yielding an effective 30×30×30 interior. Positioning chunks at 30-voxel increments prevents cracks across chunk borders (see `apron.md`).
 - We will add a non-resizable, transformable grid. Chunks are parented to the grid root entity so `TransformSystemGroup` maintains `LocalToWorld` automatically.
 - Background processing: no sync points; jobs are chained with deferred job arrays and structural changes are recorded via ECBs (never from inside jobs). Jobs are only scheduled from the managing thread.
+  - Per‑mesh job fencing is provided by `VoxelJobFenceRegistry` managed by `VoxelJobFenceRegistrySystem`; all writers/readers must chain to and update the entity’s fence.
 
 ### Manual Check
 - Packages: Entities 1.3.14, Collections 2.5.7, Burst 1.8.24, Mathematics 1.3.2
@@ -84,6 +85,7 @@ All systems follow the Jobs scheduling and HPC#/Burst rules:
 - Use `[BurstCompile]` on hot paths; pass only blittable data; avoid `UnityEngine.*` in Burst paths.
 - Chain dependencies with `JobHandle` and `JobHandle.CombineDependencies`.
 - Use ECB/ParallelWriter for structural changes and play back after jobs.
+ - Respect per‑entity fences via `VoxelJobFenceRegistry.Tail(e)` and `VoxelJobFenceRegistry.Update(e, handle)`; complete fences at managed apply boundaries.
 
 1) GridChunkAllocationSystem
 - Purpose: Create and place chunk entities for each grid root (`NativeVoxelGrid`).
@@ -104,13 +106,16 @@ All systems follow the Jobs scheduling and HPC#/Burst rules:
 - Query: entities with `NeedsRemesh` enabled; optionally filter by visibility/dirty flags.
 - Output: `NativeList<Entity>` exposed as `AsDeferredJobArray()` to downstream stages.
 - No sync points; only dependency chaining.
+ - Fencing: queueing does not mutate fences; downstream schedulers will read/update via `VoxelJobFenceRegistry`.
 
 3) NaiveSurfaceNetsScheduleSystem
 - Purpose: Schedule meshing jobs for enqueued chunks.
 - Input: Deferred array from `MeshingQueueSystem`.
 - For each chunk:
   - Prepare/access per-chunk volume/material buffers (with apron), using policy constants (`32`/`30`).
-  - Schedule `NaiveSurfaceNets` IJob (Burst) with `voxelSize`; assert `CHUNK_SIZE == 32`.
+  - Read pre‑dependency from `VoxelJobFenceRegistry.Tail(chunk)`.
+  - Schedule `NaiveSurfaceNets` IJob (Burst) with `voxelSize` using that dependency; assert `CHUNK_SIZE == 32`.
+  - Immediately `VoxelJobFenceRegistry.Update(chunk, scheduledHandle)` to extend the fence.
   - Record tag updates with `ECB.ParallelWriter`:
     - Disable `NeedsRemesh` on success
     - Enable `NeedsManagedMeshUpdate` for renderer upload
@@ -122,6 +127,7 @@ All systems follow the Jobs scheduling and HPC#/Burst rules:
 - Input: `ChunkBounds.LocalBounds` stored in grid space + grid's `LocalToWorld`.
 - Fetch grid `LocalToWorld` once per update, then compute each chunk world AABB by transforming its grid-local AABB with the single grid matrix (avoid per-chunk transform lookups).
 - Mark/clear `NeedsSpatialUpdate` appropriately (reuse existing patterns).
+ - Fencing: reading transform/AABB components is main‑thread; does not alter per‑mesh fences.
 
 5) GridChunksCleanupSystem
 - Purpose: Ensure cleanup logic runs when a grid is destroyed while using `LinkedEntityGroup` for chunk destruction.
@@ -146,6 +152,7 @@ All systems follow the Jobs scheduling and HPC#/Burst rules:
     - `EntityMeshColliderAttachment { attachTo = meshCollider }`
     - `EntityGameObjectTransformAttachment { attachTo = chunkGO.transform }`
   - Add `ChunkHybridReady` tag to prevent re-instantiation.
+  - Before applying mesh/collider updates on the main thread, call `VoxelJobFenceRegistry.CompleteAndReset(chunk)` to ensure all scheduled work for that chunk has finished.
 - Notes:
   - Rely on Unity’s Transform parenting to propagate the grid transform to chunk GOs (no ECS→GO transform sync needed).
   - On destruction, `LinkedEntityGroup` handles chunk entity lifetime; the managed system should destroy corresponding GOs if needed (or rely on parent GO destruction).
@@ -174,6 +181,7 @@ var world = Unity.Mathematics.Geometry.Math.Transform(gridL2W, local);
 - Aggregate chunk work into `NativeList<Entity>` and pass down via `AsDeferredJobArray()` to avoid reading list lengths on the main thread.
 - Record all structural changes in ECB/ParallelWriter; play back after dependent jobs complete.
 - Call `JobHandle.ScheduleBatchedJobs()` after batching schedules; avoid `.Complete()` except where results are required at boundaries.
+ - Use `VoxelJobFenceRegistry` to read the current fence for each entity before scheduling and to update it with the returned job handle; only complete at managed apply boundaries.
 
 ### Burst/HPC# Constraints (hot paths)
 - Entry points are static, `[BurstCompile]`, unmanaged-only parameters.
@@ -209,6 +217,17 @@ Deferred work list pattern:
 // ... fill in parallel ...
 var deferred = list.AsDeferredJobArray();
 // Schedule downstream jobs that consume 'deferred' without reading its length on the main thread.
+```
+
+Fenced scheduling (conceptual):
+```csharp
+// For each chunk entity 'e' to mesh
+var pre = Voxels.Core.Concurrency.VoxelJobFenceRegistry.Tail(e);
+var handle = new NaiveSurfaceNetsJob { /*...*/ }.Schedule(pre);
+Voxels.Core.Concurrency.VoxelJobFenceRegistry.Update(e, handle);
+ecb.SetComponentEnabled<NeedsRemesh>(e, false);
+ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(e, true);
+JobHandle.ScheduleBatchedJobs();
 ```
 
 ### Expected Outcomes

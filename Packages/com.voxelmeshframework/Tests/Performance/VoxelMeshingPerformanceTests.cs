@@ -1,16 +1,17 @@
-using System.Collections;
-using NUnit.Framework;
-using Unity.PerformanceTesting;
-using UnityEngine;
-using UnityEngine.TestTools;
-using Voxels.Core.Authoring;
-using Voxels.Core.Stamps;
-
-namespace Voxels.Tests.Editor
+namespace Voxels.Tests.Performance
 {
+	using System.Collections;
+	using Core.Authoring;
+	using Core.Stamps;
+	using Unity.Mathematics.Geometry;
+	using Unity.PerformanceTesting;
+	using UnityEngine;
+	using UnityEngine.TestTools;
+
 	public class VoxelMeshingPerformanceTests
 	{
-		[UnityTest, Performance]
+		[UnityTest]
+		[Performance]
 		public IEnumerator Measure_Frames_During_StampingAndMeshing()
 		{
 			var go = new GameObject("PerfVoxelMesh");
@@ -30,10 +31,7 @@ namespace Voxels.Tests.Editor
 					shape = ProceduralShape.Shape.SPHERE,
 					sphere = new ProceduralSphere { center = center, radius = radius },
 				},
-				bounds = Unity.Mathematics.Geometry.MinMaxAABB.CreateFromCenterAndExtents(
-					center,
-					radius * 2f
-				),
+				bounds = MinMaxAABB.CreateFromCenterAndExtents(center, radius * 2f),
 				strength = -0.5f,
 				material = 1,
 			};

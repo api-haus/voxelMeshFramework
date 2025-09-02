@@ -44,9 +44,11 @@ namespace Voxels.Core.Meshing.Systems
 					.WithEntityAccess()
 			)
 			{
+#if !VMF_TAIL_PIPELINE
 				// Avoid scheduling reads while volume modifications are still in-flight
-				// if (!VoxelJobFenceRegistry.TryComplete(entity))
-				// continue;
+				if (!VoxelJobFenceRegistry.TryComplete(entity))
+					continue;
+#endif
 
 				ref var nvm = ref nativeVoxelMeshRef.ValueRW;
 

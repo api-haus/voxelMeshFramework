@@ -69,10 +69,11 @@ namespace Voxels.Core.Stamps
 					using (VoxelStampSystem_Schedule.Auto())
 					{
 						// Avoid scheduling writes while previous work for this entity is still in-flight
+#if !VMF_TAIL_PIPELINE
 						if (!VoxelJobFenceRegistry.TryComplete(spatialVoxelObject.entity))
 							continue;
+#endif
 
-						var pre = VoxelJobFenceRegistry.Get(spatialVoxelObject.entity);
 						var applyStampJob = new ApplyVoxelStampJob
 						{
 							//
@@ -83,7 +84,7 @@ namespace Voxels.Core.Stamps
 							volumeLTW = spatialVoxelObject.ltw,
 							volumeWtl = spatialVoxelObject.wtl,
 							voxelSize = spatialVoxelObject.voxelSize,
-						}.Schedule(pre);
+						}.Schedule(VoxelJobFenceRegistry.Get(spatialVoxelObject.entity));
 
 						VoxelJobFenceRegistry.Update(spatialVoxelObject.entity, applyStampJob);
 					}

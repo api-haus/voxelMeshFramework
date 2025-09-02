@@ -1,5 +1,6 @@
 namespace Voxels.Tests.Editor
 {
+	using Core.Concurrency;
 	using Core.Meshing;
 	using Core.ThirdParty.SurfaceNets;
 	using Core.ThirdParty.SurfaceNets.Utils;
@@ -17,8 +18,8 @@ namespace Voxels.Tests.Editor
 		public void OneTimeSetUp()
 		{
 			// In editor tests, we need to ensure the edge table is initialized
-			if (!SharedStaticMeshingResources.EdgeTable.IsCreated)
-				SharedStaticMeshingResources.Init();
+			SharedStaticMeshingResources.Initialize();
+			VoxelJobFenceRegistry.Initialize();
 
 			m_EdgeTable = SharedStaticMeshingResources.EdgeTable;
 		}

@@ -20,8 +20,8 @@ namespace Voxels.Tests.Editor
 		[OneTimeSetUp]
 		public void OneTimeSetUp()
 		{
-			if (!SharedStaticMeshingResources.EdgeTable.IsCreated)
-				SharedStaticMeshingResources.Init();
+			SharedStaticMeshingResources.Initialize();
+			VoxelJobFenceRegistry.Initialize();
 		}
 
 		[Test]

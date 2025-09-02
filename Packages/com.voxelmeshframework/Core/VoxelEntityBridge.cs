@@ -24,9 +24,9 @@ namespace Voxels.Core
 			using var _ = VoxelEntityBridge_TryGetEntityManager.Auto();
 			em = default;
 			var world = World.DefaultGameObjectInjectionWorld;
-			if (!world.IsCreated)
+			if (world is not { IsCreated: true })
 			{
-				Log.Warning("DefaultGameObjectInjectionWorld is not created!");
+				Log.Verbose("DefaultGameObjectInjectionWorld is not created!");
 				return false;
 			}
 

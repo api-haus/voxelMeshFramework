@@ -21,8 +21,6 @@ namespace Voxels.Core.Procedural
 		{
 			using var _ = ProceduralVoxelGenerationSystem_Update.Auto();
 
-			var concurrentJobs = default(JobHandle);
-
 			var ecb = SystemAPI.GetSingleton<EndSimST>().CreateCommandBuffer(World.Unmanaged);
 
 			foreach (
@@ -44,21 +42,21 @@ namespace Voxels.Core.Procedural
 				ref readonly var voxelObject = ref voxelObjectRef.ValueRO;
 
 				// Avoid scheduling writes while previous work for this entity is still in-flight
+#if !VMF_TAIL_PIPELINE
 				if (!VoxelJobFenceRegistry.TryComplete(entity))
 					continue;
+#endif
 
 				using (ProceduralVoxelGenerationSystem_Schedule.Auto())
 				{
-					var pre = VoxelJobFenceRegistry.Get(entity);
 					var job = pcg.generator.Schedule(
 						Transform((float3x3)ltw.Value, voxelObject.localBounds),
 						voxelObject.voxelSize,
 						mesh.volume,
-						pre
+						VoxelJobFenceRegistry.Get(entity)
 					);
 
 					VoxelJobFenceRegistry.Update(entity, job);
-					concurrentJobs = JobHandle.CombineDependencies(job, concurrentJobs);
 				}
 
 				ecb.SetComponentEnabled<NeedsProceduralUpdate>(entity, false);

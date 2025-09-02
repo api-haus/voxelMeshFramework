@@ -20,7 +20,7 @@ namespace Voxels.Tests.Editor
 		{
 			// Initialize edge table for tests
 			if (!SharedStaticMeshingResources.EdgeTable.IsCreated)
-				SharedStaticMeshingResources.Init();
+				SharedStaticMeshingResources.Initialize();
 
 			m_EdgeTable = SharedStaticMeshingResources.EdgeTable;
 		}

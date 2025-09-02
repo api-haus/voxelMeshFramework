@@ -2,11 +2,65 @@
 
 #include "./Normals.hlsl"
 
-struct SingleUVTextureArraySampler {
-  half3 blend;
-  half2 uv;
-  half2 uvDx;
-  half2 uvDy;
+inline half3 blend_triplanar_normal(in half3 mappedNormal,
+                                    in half3 surfaceNormal) {
+  half3 n;
+  n.xy = mappedNormal.xy + surfaceNormal.xy;
+  n.z = mappedNormal.z * surfaceNormal.z;
+  return n;
+}
+
+struct TriplanarUV {
+  half2 x, y, z;
+};
+
+TriplanarUV get_triplanar_uv(in float3 localPos, in float3 localNormal) {
+  TriplanarUV triUV;
+  float3 p = localPos * _UVScale;
+  
+  // Calculate UV coordinates for each axis projection
+  triUV.x = p.zy; // X-axis uses YZ plane
+  triUV.y = p.xz; // Y-axis uses XZ plane  
+  triUV.z = p.xy; // Z-axis uses XY plane
+  
+  // Handle negative normals to prevent mirroring artifacts
+  if (localNormal.x < 0) {
+    triUV.x.x = -triUV.x.x;
+  }
+  if (localNormal.y < 0) {
+    triUV.y.x = -triUV.y.x;
+  }
+  if (localNormal.z >= 0) {
+    triUV.z.x = -triUV.z.x;
+  }
+  
+  // Add offsets to prevent seams
+  triUV.x.y += 0.5;
+  triUV.z.x += 0.5;
+  
+  return triUV;
+}
+
+half3 get_triplanar_weights(in float3 localNormal, in half heightX, in half heightY, in half heightZ) {
+  half3 triW = abs(localNormal);
+  triW = saturate(triW - _BlendOffset);
+  // Height-based blending will be implemented in next step
+  triW = pow(triW, _BlendContrast / 8.0);
+  return triW / (triW.x + triW.y + triW.z);
+}
+
+half3 get_triplanar_weights_simple(in float3 localNormal) {
+  half3 triW = abs(localNormal);
+  triW = pow(triW, _BlendContrast / 8.0);
+  return triW / (triW.x + triW.y + triW.z);
+}
+
+struct TriplanarTextureArraySampler {
+  TriplanarUV triUV;
+  half3 triWeights;
+  half2 uvDxX, uvDyX;
+  half2 uvDxY, uvDyY;
+  half2 uvDxZ, uvDyZ;
 
   half4 sample(in int chan, TEXTURE2D_ARRAY(t2d), SAMPLER(smp)) {
     return SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uv, chan, uvDx, uvDy);
@@ -20,46 +74,33 @@ struct SingleUVTextureArraySampler {
   void sampleNormal(in float3 worldNormal, in int chan, TEXTURE2D_ARRAY(t2d),
                     SAMPLER(smp), out half3 normal, out half smoothness,
                     out half ao) {
-    half4 sample =
-        SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uv, chan, uvDx, uvDy).agrb;
+    half4 s = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uv, chan, uvDx, uvDy).agrb;
 
-    // Unpack the tangent space normal
-    half3 tangentNormal = unpack_normal(sample.xy);
+    // Unpack tangent-space normal once (single sample)
+    half3 tnorm = unpack_normal(s.xy);
 
-    // Create a proper tangent space to world space transformation
-    // Since we're using blended UVs, we approximate the tangent space using the
-    // blend weights
-    half3 absNormal = abs(worldNormal);
-
-    // Determine the dominant axis and create tangent vectors accordingly
-    half3 tangent, bitangent;
-    if (absNormal.x >= absNormal.y && absNormal.x >= absNormal.z) {
-      // X is dominant - YZ plane projection
-      tangent = normalize(half3(0, sign(worldNormal.x), 0));
-      bitangent = normalize(half3(0, 0, -sign(worldNormal.x)));
-    } else if (absNormal.y >= absNormal.z) {
-      // Y is dominant - XZ plane projection
-      tangent = normalize(half3(-sign(worldNormal.y), 0, 0));
-      bitangent = normalize(half3(0, 0, sign(worldNormal.y)));
-    } else {
-      // Z is dominant - XY plane projection
-      tangent = normalize(half3(sign(worldNormal.z), 0, 0));
-      bitangent = normalize(half3(0, sign(worldNormal.z), 0));
+    // Create axis-oriented interpretations and correct handedness per axis
+    half3 nx = tnorm;
+    half3 ny = tnorm;
+    half3 nz = tnorm;
+    if (worldNormal.x < 0) {
+      nx.x = -nx.x;
+    }
+    if (worldNormal.y < 0) {
+      ny.x = -ny.x;
+    }
+    if (worldNormal.z >= 0) {
+      nz.x = -nz.x;
     }
 
-    // Transform tangent space normal to world space
-    // Blend between the transformed normal and original world normal based on
-    // normal strength
-    half3 worldTangentNormal =
-        normalize(tangent * tangentNormal.x + bitangent * tangentNormal.y +
-                  worldNormal * tangentNormal.z);
+    // Convert to world-space per axis using triplanar swizzles and blend
+    half3 wx = blend_triplanar_normal(nx, worldNormal.zyx).zyx;
+    half3 wy = blend_triplanar_normal(ny, worldNormal.xzy).xzy;
+    half3 wz = blend_triplanar_normal(nz, worldNormal);
+    normal = normalize(wx * blend.x + wy * blend.y + wz * blend.z);
 
-    // Interpolate based on the blend weights for smoother transitions
-    half dominantWeight = max(blend.x, max(blend.y, blend.z));
-    normal = normalize(lerp(worldNormal, worldTangentNormal, dominantWeight));
-
-    smoothness = saturate(sample.b);
-    ao = saturate(sample.a);
+    smoothness = saturate(s.b);
+    ao = saturate(s.a);
   }
 
   void gather(in float3 localNormal, in float3 localPos) {

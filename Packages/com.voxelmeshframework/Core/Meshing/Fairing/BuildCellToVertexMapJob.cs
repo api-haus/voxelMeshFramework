@@ -33,7 +33,6 @@ namespace Voxels.Core.Meshing.Fairing
 		/// Size: CHUNK_SIZE^3, initialized to -1 (empty).
 		/// </summary>
 		[NoAlias]
-		[WriteOnly]
 		public NativeArray<int> cellToVertex;
 
 		/// <summary>

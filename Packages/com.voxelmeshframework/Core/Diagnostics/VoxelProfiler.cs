@@ -103,8 +103,8 @@ namespace Voxels.Core.Diagnostics
 				"Voxels/Meshing/Processor/ApplyManaged"
 			);
 
-			public static readonly ProfilerMarker SharedStaticMeshingResources_Init = new(
-				"Voxels/Shared/Init"
+			public static readonly ProfilerMarker SharedStaticMeshingResources_Initialize = new(
+				"Voxels/Shared/Initialize"
 			);
 
 			public static readonly ProfilerMarker SharedStaticMeshingResources_FillEdgeTable = new(

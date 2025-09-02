@@ -12,6 +12,21 @@ Recommended storage
 - Primary: a system‑owned `NativeParallelHashMap<Entity, JobHandle>` (Fence Registry) keyed by entity. Access only from systems (not inside Burst jobs).
 - Alternative: extend `NativeVoxelMesh` with a non‑serialized fence. This can couple system‑level dependencies via type access and is not the default recommendation.
 
+### Concrete Implementation: VoxelJobFenceRegistry
+- Implemented as `VoxelJobFenceRegistry` backed by a `SharedStatic<NativeParallelHashMap<Entity, JobHandle>>`.
+- Lifecycle is managed by `VoxelJobFenceRegistrySystem` (initialized on create, disposed on destroy; runs early in `SimulationSystemGroup`).
+- Public API (systems/main thread only):
+  - `Initialize(int capacity)` / `Dispose()` / `IsCreated`
+  - `Get(Entity)` and `Tail(Entity)` — return current fence or `default` if none
+  - `Update(Entity, JobHandle)` — replace entity’s fence with provided handle
+  - `Reset(Entity)` — remove fence entry
+  - `CompleteAndReset(Entity)` — `Complete()` current fence and clear it
+  - `TryComplete(Entity)` — if fence is `default` or already completed, call `Complete()`, clear entry, and return `true`; otherwise return `false`
+
+Notes
+- Do not access the registry from inside Burst jobs. Read/update it only in systems when scheduling or at managed boundaries.
+- Use `Tail(e)` as the dependency source when scheduling, and immediately `Update(e, scheduledHandle)` with the returned handle.
+
 ### Writer Phase (Stamps / Procedural)
 Systems: `VoxelStampSystem`, `ProceduralVoxelGenerationSystem`
 1) Gather all affected meshes.
@@ -25,6 +40,17 @@ Notes
 - Destroying stamp entities at ECB playback is safe: job data is captured at schedule time.
 - Add `[UpdateBefore(typeof(VoxelMeshingSystem))]` (or the specific meshing schedule system) to ensure all writer schedules occur before meshing schedules.
 
+Concrete API usage (writers)
+```csharp
+// per affected mesh entity e
+var pre = Voxels.Core.Concurrency.VoxelJobFenceRegistry.Tail(e);
+var writeJob = new WriteSdfJob { /*...*/ }.Schedule(pre);
+// If multiple jobs are scheduled, combine them before updating
+Voxels.Core.Concurrency.VoxelJobFenceRegistry.Update(e, writeJob);
+ecb.SetComponentEnabled<NeedsRemesh>(e, true);
+JobHandle.ScheduleBatchedJobs();
+```
+
 ### Reader Phase (Meshing)
 System: meshing scheduler (e.g., `NaiveSurfaceNetsScheduleSystem`)
 1) Query meshes with `NeedsRemesh` enabled.
@@ -32,6 +58,17 @@ System: meshing scheduler (e.g., `NaiveSurfaceNetsScheduleSystem`)
 3) Schedule meshing jobs (read volume) with that dependency; update the fence to the returned handle.
 4) Enable `NeedsManagedMeshUpdate` and disable `NeedsRemesh` via ECB.
 5) Do not assign `state.Dependency`; call `JobHandle.ScheduleBatchedJobs()` and rely on per‑entity fences. Complete at the managed apply boundary.
+Concrete API usage (readers)
+```csharp
+// per mesh entity e with NeedsRemesh
+var pre = Voxels.Core.Concurrency.VoxelJobFenceRegistry.Tail(e);
+var meshJob = new MeshReadJob { /*...*/ }.Schedule(pre);
+Voxels.Core.Concurrency.VoxelJobFenceRegistry.Update(e, meshJob);
+ecb.SetComponentEnabled<NeedsRemesh>(e, false);
+ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(e, true);
+JobHandle.ScheduleBatchedJobs();
+```
+
 
 ### Multi‑Chunk Stamps (Deferred/Optional)
 - Current plan: schedule per entity using each entity’s own fence without pre‑merging across many chunks.
@@ -42,6 +79,13 @@ System: meshing scheduler (e.g., `NaiveSurfaceNetsScheduleSystem`)
 - No `.Complete()` in normal flow; rely on per‑mesh fences for correctness. Use `.Complete()` only at boundaries that must observe results synchronously (e.g., managed mesh apply, rare debugging or shutdown).
 - Managed boundary: complete the entity’s fence before applying meshes on the main thread, then reset that entity’s fence to `default` to avoid unbounded chains.
 - If recording structural changes from jobs via `ECB.ParallelWriter`, set the ECB system’s dependency accordingly; otherwise avoid assigning `state.Dependency`.
+
+Managed boundary (apply) — concrete API
+```csharp
+// Before uploading to Mesh/MeshCollider on main thread
+Voxels.Core.Concurrency.VoxelJobFenceRegistry.CompleteAndReset(e);
+// ...apply mesh data...
+```
 
 ### Ordering and Safety
 - Writers must be scheduled before readers for the same frame: `[UpdateBefore(typeof(…Meshing…))]` on both stamp and procedural systems.
@@ -91,6 +135,9 @@ foreach (var c in chunks)
 - Stamps update each affected mesh’s fence individually; no cross‑entity pre‑merge in the current plan.
 - Systems generally do not assign `state.Dependency`; call `ScheduleBatchedJobs()`. Assign dependencies only when recording ECB from jobs.
 - Ordering: Writers `[UpdateBefore]` readers; readers tolerate `NeedsRemesh` arriving early via fence chaining.
+
+Implementation status
+- Fence registry lives in `VoxelJobFenceRegistry` with lifecycle handled by `VoxelJobFenceRegistrySystem` (Default + Editor worlds). Use `Tail/Update/CompleteAndReset/TryComplete` as shown above.
 
 ### System Groups, Dependencies, and ECB Playback
 - `state.Dependency` represents a system’s incoming deps and any jobs scheduled within it. You only need to assign it if:

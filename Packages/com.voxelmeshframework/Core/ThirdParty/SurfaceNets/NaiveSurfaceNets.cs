@@ -1113,7 +1113,7 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 			var w3 = 0f;
 			var count = 0f;
 
-			void Acc(byte mat)
+			void acc(byte mat)
 			{
 				if (mat == MATERIAL_AIR)
 					return; // skip AIR
@@ -1137,14 +1137,14 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				count += 1f;
 			}
 
-			Acc(m0);
-			Acc(m1);
-			Acc(m2);
-			Acc(m3);
-			Acc(m4);
-			Acc(m5);
-			Acc(m6);
-			Acc(m7);
+			acc(m0);
+			acc(m1);
+			acc(m2);
+			acc(m3);
+			acc(m4);
+			acc(m5);
+			acc(m6);
+			acc(m7);
 			if (count > 0f)
 			{
 				var inv = 1f / count;
