@@ -1,6 +1,7 @@
 Assets/*
 !Assets/Shaders
 Packages/com.jbooth*
+!Packages/com.jbooth.microsplat.core*
 ProjectSettings/
 
 !Library/
@@ -15,3 +16,5 @@ Library/PackageCache/*
 !Library/PackageCache/com.unity.cinemachine*
 !Library/PackageCache/com.unity.test-framework*
 !*.pdf
+!*.cpp
+

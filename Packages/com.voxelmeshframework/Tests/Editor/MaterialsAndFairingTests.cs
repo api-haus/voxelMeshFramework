@@ -34,11 +34,11 @@ namespace Voxels.Tests.Editor
 		NativeArray<ushort> m_EdgeTable;
 
 		/// <summary>
-		///   Tests that NaiveSurfaceNets properly assigns discrete material IDs to vertices
-		///   using the nearest-corner rule within each cell.
+		///   Tests that NaiveSurfaceNets encodes blended material weights (corner-sum)
+		///   into RGBA, where channels correspond to material ids % 4.
 		/// </summary>
 		[Test]
-		public void NaiveSurfaceNets_MaterialAssignment_UsesNearestCornerRule()
+		public void NaiveSurfaceNets_MaterialAssignment_EncodesBlendedCornerSum()
 		{
 			// Arrange - Create a simple two-material sphere setup
 			var volume = new NativeArray<sbyte>(VOLUME_LENGTH, Allocator.TempJob);
@@ -94,21 +94,19 @@ namespace Voxels.Tests.Editor
 				// Assert
 				Assert.Greater(vertices.Length, 0, "Sphere should produce vertices");
 
-				// Verify that all vertices have valid material assignments
+				// With corner-sum blending and 1-based material mapping (1->R, 2->G, ...),
+				// only materials 1 (R) and 2 (G) are present.
 				for (var i = 0; i < vertices.Length; i++)
 				{
-					var vertex = vertices[i];
-					var materialId = vertex.color.r;
-
+					var c = vertices[i].color;
+					// A corresponds to material 4, which is absent here
+					Assert.AreEqual(0, c.a, $"Vertex {i} color.a (mat4) should be 0");
+					// Only R (mat 1) and G (mat 2) contribute; allow any normalized split
+					var sumRG = c.r + c.g;
 					Assert.IsTrue(
-						materialId == innerMaterial || materialId == outerMaterial,
-						$"Vertex {i} should have valid material ID ({materialId}), expected {innerMaterial} or {outerMaterial}"
+						sumRG > 0 && sumRG <= 255,
+						$"Vertex {i} R+G should be >0 and <=255, got {sumRG}"
 					);
-
-					// Verify that color channels other than R are as expected
-					Assert.AreEqual(0, vertex.color.g, $"Vertex {i} color.g should be 0");
-					Assert.AreEqual(0, vertex.color.b, $"Vertex {i} color.b should be 0");
-					Assert.AreEqual(255, vertex.color.a, $"Vertex {i} color.a should be 255");
 				}
 			}
 			finally

@@ -21,9 +21,11 @@ _EmissiveStrength("Emissive Strength", Float) = 1.0                             
 _FresnelPower("Fresnel Power", Range(0.5,16)) = 1.0                                            //
 _FresnelStrength("Fresnel Strength", Range(0.01,2)) = 1.0                                            //
 [BetterHeader(Sampling)]  //
-[Toggle(_USE_BIPLANAR)] _UseBiplanar("Biplanar (on) Triplanar (off)", Float) = 0  //
+[KeywordEnum(ONE, TWO, THREE)]_TEX_SAMPLE("Texture Samples", Float) = 0  //
 _UVScale("UV Scale", Float) = 1.0                                             //
 _BlendContrast("Blend Contrast", Range(0.5,8)) = 1.0                                            //
+[BetterHeader(Blending)] //
+_MaterialContrast("Material Contrast", Range(0.5,8)) = 1.0 //
 [BetterHeader(Displacement)]
 [Toggle(_USE_VERTEX_DISPLACEMENT)] _VertexDisplacement("Vertex Displacement", Float) = 0  //
 _VertexDisplacementStrength("Vertex Displacement Strength", Range(0,2.0)) = 1.0                                            //
@@ -39,6 +41,7 @@ half _FresnelPower;
 half _FresnelStrength;
 half _UVScale;
 half _BlendContrast;
+half _MaterialContrast;
 half _VertexDisplacementStrength;
 half _VertexDisplacementOffset;
 half _Parallax;
@@ -48,7 +51,7 @@ BEGIN_DEFINES
 #pragma shader_feature_local _ _USE_VERTEX_DISPLACEMENT
 #pragma shader_feature_local _ _USE_PARALLAX
 #pragma shader_feature_local _ _USE_FRESNEL
-#pragma shader_feature_local _ _USE_BIPLANAR
+#pragma shader_feature_local _ _TEX_SAMPLE_ONE _TEX_SAMPLE_TWO _TEX_SAMPLE_THREE
 #define _WORLDSPACENORMAL 1
 END_DEFINES
 
@@ -59,15 +62,8 @@ TEXTURE2D_ARRAY(_NormalSAO);
 SAMPLER(sampler_NormalSAO);
 TEXTURE2D_ARRAY(_EmissiveMetallic);
 
-#if _USE_BIPLANAR
-#include "./Biplanar.hlsl"
-#define kSampler BiplanarTextureArraySampler
-#else
-#include "./Triplanar.hlsl"
-#define kSampler TriplanarTextureArraySampler
-#endif
-
-#include "./Parallax.hlsl"
+// Centralized surface logic and sampler selection lives in this include
+#include "./VoxelSurface.hlsl"
 
 void ModifyVertex(inout VertexData v, inout ExtraV2F d)
 {
@@ -90,50 +86,32 @@ void ModifyVertex(inout VertexData v, inout ExtraV2F d)
 }
 
 void SurfaceFunction(inout Surface o, ShaderData d) {
-  kSampler s = (kSampler)0;
+  half3 outAlbedo;
+  half outMetallic;
+  half outSmoothness;
+  half3 outEmission;
+  half outOcclusion;
+  half3 outNormal;
 
-  s.gather(d.worldSpaceNormal, d.worldSpacePosition);
+  // Interpret vertex color RGBA as material weights
+  voxel_surface_half(
+      (half4)d.vertexColor,
+      (half3)d.worldSpacePosition,
+      (half3)d.worldSpaceNormal,
+      (half3)d.tangentSpaceViewDir,
+      outAlbedo,
+      outMetallic,
+      outSmoothness,
+      outEmission,
+      outOcclusion,
+      outNormal);
 
-  // Get material ID from vertex color (discrete material assignment)
-  float materialId = (d.vertexColor.r * 255.0);
-
-  // Sample material textures
-  half4 albedoHeight = s.sample(materialId, _Diffuse, sampler_Diffuse);
-  o.Height = albedoHeight.a;
-
-#if _USE_PARALLAX
-  // Apply parallax offset
-  half2 offset = ParallaxOffsetT(o.Height, _Parallax, d.tangentSpaceViewDir);
-  s.offset(offset);
-  
-  // Re-sample with parallax offset
-  albedoHeight = s.sample(materialId, _Diffuse, sampler_Diffuse);
-  o.Height = albedoHeight.a;
-#endif
-
-  // Set albedo
-  o.Albedo = albedoHeight.rgb;
-
-  // Sample normal, smoothness, and AO
-  half3 normal;
-  half smoothness;
-  half ao;
-  
-  s.sampleNormal(d.worldSpaceNormal, materialId, _NormalSAO, sampler_NormalSAO,
-                 normal, smoothness, ao);
-  
-  o.Normal = normal;
-  o.Smoothness = smoothness;
-  o.Occlusion = ao;
-
-  // Sample emissive/metallic
-  half4 emissiveMetal = s.sample(materialId, _EmissiveMetallic, sampler_Diffuse);
-  o.Metallic = emissiveMetal.a;
-  o.Emission = emissiveMetal.rgb * _EmissiveStrength;
-
-#if _USE_FRESNEL
-  o.Albedo += o.Albedo * pow((1.0 - saturate(dot(d.worldSpaceNormal, d.worldSpaceViewDir))), _FresnelPower) * _FresnelStrength;
-#endif
+  o.Albedo = outAlbedo;
+  o.Metallic = outMetallic;
+  o.Smoothness = outSmoothness;
+  o.Emission = outEmission;
+  o.Occlusion = outOcclusion;
+  o.Normal = outNormal;
 }
 
 END_CODE

@@ -428,25 +428,78 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 		}
 
 		/// <summary>
-		///   Determines vertex material by finding the dominant material in the cell.
-		///   Following the paper: "assign each vertex to the material that dominates
-		///   the cell containing the vertex."
+		///   Determines vertex material by dominant non-air label within the 2x2x2 cell.
+		///   Skips MATERIAL_AIR, breaks ties by nearest corner to the vertex.
 		/// </summary>
 		[SkipLocalsInit]
 		unsafe Color32 GetVertexMaterialInfo(int* pos, float3 vertexOffset, byte* materialsPtr)
 		{
-			// Minimal discrete assignment: pick the label at the nearest cell corner
-			// to the computed vertex position. This avoids interpolation and counts.
-			var cx = vertexOffset.x >= 0.5f ? 1 : 0;
-			var cy = vertexOffset.y >= 0.5f ? 1 : 0;
-			var cz = vertexOffset.z >= 0.5f ? 1 : 0;
+			// Track up to 8 unique materials with counts and nearest-corner distance
+			var uniqueMats = stackalloc byte[8];
+			var counts = stackalloc int[8];
+			var minDist = stackalloc float[8];
+			for (var i = 0; i < 8; i++)
+			{
+				uniqueMats[i] = MATERIAL_AIR;
+				counts[i] = 0;
+				minDist[i] = float.MaxValue;
+			}
 
-			var corner = new int3(pos[0] + cx, pos[1] + cy, pos[2] + cz);
-			var index = (corner.x * CHUNK_SIZE * CHUNK_SIZE) + (corner.y * CHUNK_SIZE) + corner.z;
-			var material = materialsPtr[index];
+			int uniqueCount = 0;
 
-			// R: Material ID, others reserved
-			return new Color32(material, 0, 0, 255);
+			for (var i = 0; i < 8; i++)
+			{
+				var corner = new float3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+				var cornerX = math.min(pos[0] + (int)corner.x, CHUNK_SIZE - 1);
+				var cornerY = math.min(pos[1] + (int)corner.y, CHUNK_SIZE - 1);
+				var cornerZ = math.min(pos[2] + (int)corner.z, CHUNK_SIZE - 1);
+				var cornerIndex = (cornerX * CHUNK_SIZE * CHUNK_SIZE) + (cornerY * CHUNK_SIZE) + cornerZ;
+
+				var mat = materialsPtr[cornerIndex];
+				if (mat == MATERIAL_AIR)
+					continue; // skip air
+
+				var dist = length(corner - vertexOffset);
+
+				// Find or insert material entry
+				var found = false;
+				for (var u = 0; u < uniqueCount; u++)
+				{
+					if (uniqueMats[u] == mat)
+					{
+						counts[u] += 1;
+						if (dist < minDist[u])
+							minDist[u] = dist;
+						found = true;
+						break;
+					}
+				}
+
+				if (!found && uniqueCount < 8)
+				{
+					uniqueMats[uniqueCount] = mat;
+					counts[uniqueCount] = 1;
+					minDist[uniqueCount] = dist;
+					uniqueCount++;
+				}
+			}
+
+			byte selected = MATERIAL_AIR;
+			if (uniqueCount > 0)
+			{
+				var bestIdx = 0;
+				for (var u = 1; u < uniqueCount; u++)
+				{
+					if (
+						counts[u] > counts[bestIdx]
+						|| (counts[u] == counts[bestIdx] && minDist[u] < minDist[bestIdx])
+					)
+						bestIdx = u;
+				}
+				selected = uniqueMats[bestIdx];
+			}
+
+			return new Color32(selected, 0, 0, 255);
 		}
 
 		/// <summary>

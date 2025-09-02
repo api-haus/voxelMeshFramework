@@ -15,6 +15,7 @@
     "com.unity.shadergraph": "17.3.0",
     "com.unity.timeline": "1.8.9",
     "com.unity.toolchain.macos-arm64-linux-x86_64": "2.0.4",
+    "moe.meryuhi.effects.fog": "https://github.com/meryuhi/URPFog.git?path=Packages/Fog",
     "com.unity.modules.accessibility": "1.0.0",
     "com.unity.modules.androidjni": "1.0.0",
     "com.unity.modules.animation": "1.0.0",

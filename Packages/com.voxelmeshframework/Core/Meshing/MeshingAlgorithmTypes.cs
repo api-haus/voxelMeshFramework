@@ -40,24 +40,14 @@ namespace Voxels.Core.Meshing
 
 	/// <summary>
 	///   Controls how voxel materials are encoded per vertex.
+	///   Single supported mode: corner-sum blended RGBA weights.
 	/// </summary>
 	public enum MaterialDistributionMode : byte
 	{
 		/// <summary>
-		///   Assign discrete material ID from the nearest voxel corner (stored in color.r).
-		/// </summary>
-		[Obsolete("Deprecated: use BLENDED_RGBA_WEIGHTS or BLENDED_CORNER_SUM")]
-		DISCRETE_NEAREST_CORNER = 0,
-
-		/// <summary>
-		///   Encode up to 4 material weights in RGBA channels via inverse distance weighting.
-		/// </summary>
-		BLENDED_RGBA_WEIGHTS = 1,
-
-		/// <summary>
 		///   Encode up to 4 material weights using corner-sum of the 8 cube corners (counts per material), normalized.
 		/// </summary>
-		BLENDED_CORNER_SUM = 2,
+		BLENDED_CORNER_SUM = 0,
 	}
 
 	/// <summary>
@@ -178,7 +168,7 @@ namespace Voxels.Core.Meshing
 				fairingStepSize = 0.6f,
 				cellMargin = 0.1f,
 				recomputeNormalsAfterFairing = false,
-				materialDistributionMode = MaterialDistributionMode.BLENDED_RGBA_WEIGHTS,
+				materialDistributionMode = MaterialDistributionMode.BLENDED_CORNER_SUM,
 			};
 	}
 }

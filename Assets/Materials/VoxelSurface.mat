@@ -163,7 +163,7 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _MaterialContrast: 7
+    - _MaterialContrast: 4
     - _Metallic: 0
     - _NormalScale: 1
     - _NormalStrength: 2

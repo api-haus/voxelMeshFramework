@@ -180,5 +180,10 @@ namespace Voxels.Core
 
 		public const int Y_SHIFT = 5; // y * 32
 		public const int Z_SHIFT = 0; // z * 1
+
+		/// <summary>
+		///   Reserved material id representing air/empty space. Must be 0 across the system.
+		/// </summary>
+		public const byte MATERIAL_AIR = 0;
 	}
 }

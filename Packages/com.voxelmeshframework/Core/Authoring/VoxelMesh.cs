@@ -46,7 +46,7 @@ namespace Voxels.Core.Authoring
 		[Header("Materials")]
 		[SerializeField]
 		internal MaterialDistributionMode materialDistributionMode =
-			MaterialDistributionMode.BLENDED_RGBA_WEIGHTS;
+			MaterialDistributionMode.BLENDED_CORNER_SUM;
 
 		void Awake()
 		{

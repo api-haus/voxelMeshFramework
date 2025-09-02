@@ -224,3 +224,5 @@ mono_crash*
 /*.png
 /*.bmp
 *.pdf
+*.cpp
+

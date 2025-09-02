@@ -177,6 +177,8 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 			// in a single memory access pattern, significantly improving performance.
 			var samples01 = stackalloc sbyte[64]; // Current Y level voxels (interleaved with X+1)
 			var samples23 = stackalloc sbyte[64]; // Next Y level voxels (interleaved with X+1)
+			var matRows01 = stackalloc byte[64]; // Current Y level materials (interleaved with X+1)
+			var matRows23 = stackalloc byte[64]; // Next Y level materials (interleaved with X+1)
 
 			// Get direct pointer to volume data for high-performance SIMD access
 			var volumePtr = (sbyte*)volume.GetUnsafeReadOnlyPtr();
@@ -201,7 +203,13 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				// ===== INITIALIZE X COLUMN =====
 				// Pre-calculate sign masks for the first Y level of the current X column.
 				// This setup allows reuse of calculations as we iterate through Y levels.
-				(mask2, mask3) = ExtractSignBitsAndSamples(volumePtr, samples23, x);
+				(mask2, mask3) = ExtractSignBitsAndSamples(
+					volumePtr,
+					samples23,
+					materialsPtr,
+					matRows23,
+					x
+				);
 
 				// Process each Y level in the current X column
 				for (var y = 0; y < CHUNK_SIZE_MINUS_ONE; y++)
@@ -214,13 +222,24 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 					samples01 = samples23; // Previous "next Y" becomes current "current Y"
 					samples23 = temp; // Previous "current Y" will be filled with new "next Y"
 
+					var tempMat = matRows01;
+					matRows01 = matRows23; // Mirror rotation for materials
+					matRows23 = tempMat; // Will be filled with new "next Y"
+
 					// ===== SIGN MASK ROTATION =====
 					// Similarly reuse previously calculated sign masks for the current Y level.
 					mask0 = mask2; // Previous "next Y, current X" becomes "current Y, current X"
 					mask1 = mask3; // Previous "next Y, next X" becomes "current Y, next X"
 
 					// Calculate new sign masks for the next Y level
-					(mask2, mask3) = ExtractSignBitsAndSamples(volumePtr, samples23, x, y);
+					(mask2, mask3) = ExtractSignBitsAndSamples(
+						volumePtr,
+						samples23,
+						materialsPtr,
+						matRows23,
+						x,
+						y
+					);
 
 					// ===== SIMD MASK PREPARATION =====
 					// Pack all four sign masks into a single SIMD vector for parallel processing.
@@ -335,7 +354,7 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 
 						// ===== SURFACE MESHING =====
 						// Generate vertex and triangle data for this cube
-						MeshSamples(pos, samples, edgeMask, flipTriangle, materialsPtr);
+						MeshSamples(pos, samples, edgeMask, flipTriangle, matRows01, matRows23);
 					}
 				}
 			}
@@ -361,6 +380,8 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 		unsafe (int, int) ExtractSignBitsAndSamples(
 			sbyte* volumePtr,
 			sbyte* samples23,
+			byte* materialsPtr,
+			byte* matRows23,
 			int x,
 			int y = -1 /* first case, outside Y loop */
 		)
@@ -377,6 +398,7 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 			// X_SHIFT and Y_SHIFT are bit shifts corresponding to chunk dimensions.
 			// (y + 1) accounts for the Y loop starting at -1 for initialization.
 			var ptr = volumePtr + (x << X_SHIFT) + ((y + 1) << Y_SHIFT);
+			var mptr = materialsPtr + (x << X_SHIFT) + ((y + 1) << Y_SHIFT);
 
 			// ===== SIMD DATA LOADING =====
 			// Load voxel data in 16-byte chunks for parallel processing.
@@ -392,12 +414,22 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 			v128 lo3; /* First 16 voxels at X+1 */
 			v128 hi3; /* Next 16 voxels at X+1 */
 
+			v128 mlo2; /* First 16 materials at current X */
+			v128 mhi2; /* Next 16 materials at current X */
+			v128 mlo3; /* First 16 materials at X+1 */
+			v128 mhi3; /* Next 16 materials at X+1 */
+
 			if (IsSse2Supported)
 			{
 				lo2 = load_si128(ptr + 0);
 				hi2 = load_si128(ptr + 16);
 				lo3 = load_si128(ptr + 1024); // X+1 offset in volume
 				hi3 = load_si128(ptr + 1040);
+
+				mlo2 = load_si128((sbyte*)mptr + 0);
+				mhi2 = load_si128((sbyte*)mptr + 16);
+				mlo3 = load_si128((sbyte*)mptr + 1024);
+				mhi3 = load_si128((sbyte*)mptr + 1040);
 			}
 			else if (IsNeonSupported)
 			{
@@ -405,6 +437,11 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				hi2 = vld1q_u8((byte*)(ptr + 16));
 				lo3 = vld1q_u8((byte*)(ptr + 1024));
 				hi3 = vld1q_u8((byte*)(ptr + 1040));
+
+				mlo2 = vld1q_u8(mptr + 0);
+				mhi2 = vld1q_u8(mptr + 16);
+				mlo3 = vld1q_u8(mptr + 1024);
+				mhi3 = vld1q_u8(mptr + 1040);
 			}
 			else
 			{
@@ -412,6 +449,11 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				hi2 = X86F.Sse2.load_si128(ptr + 16);
 				lo3 = X86F.Sse2.load_si128(ptr + 1024);
 				hi3 = X86F.Sse2.load_si128(ptr + 1040);
+
+				mlo2 = X86F.Sse2.load_si128((sbyte*)mptr + 0);
+				mhi2 = X86F.Sse2.load_si128((sbyte*)mptr + 16);
+				mlo3 = X86F.Sse2.load_si128((sbyte*)mptr + 1024);
+				mhi3 = X86F.Sse2.load_si128((sbyte*)mptr + 1040);
 			}
 
 			// ===== VOXEL INTERLEAVING =====
@@ -432,6 +474,11 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				store_si128(samples23 + 16, unpackhi_epi8(lo2, lo3));
 				store_si128(samples23 + 32, unpacklo_epi8(hi2, hi3));
 				store_si128(samples23 + 48, unpackhi_epi8(hi2, hi3));
+
+				store_si128((sbyte*)matRows23 + 00, unpacklo_epi8(mlo2, mlo3));
+				store_si128((sbyte*)matRows23 + 16, unpackhi_epi8(mlo2, mlo3));
+				store_si128((sbyte*)matRows23 + 32, unpacklo_epi8(mhi2, mhi3));
+				store_si128((sbyte*)matRows23 + 48, unpackhi_epi8(mhi2, mhi3));
 			}
 			else
 			{
@@ -439,6 +486,11 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				X86F.Sse2.store_si128(samples23 + 16, X86F.Sse2.unpackhi_epi8(lo2, lo3));
 				X86F.Sse2.store_si128(samples23 + 32, X86F.Sse2.unpacklo_epi8(hi2, hi3));
 				X86F.Sse2.store_si128(samples23 + 48, X86F.Sse2.unpackhi_epi8(hi2, hi3));
+
+				X86F.Sse2.store_si128((sbyte*)matRows23 + 00, X86F.Sse2.unpacklo_epi8(mlo2, mlo3));
+				X86F.Sse2.store_si128((sbyte*)matRows23 + 16, X86F.Sse2.unpackhi_epi8(mlo2, mlo3));
+				X86F.Sse2.store_si128((sbyte*)matRows23 + 32, X86F.Sse2.unpacklo_epi8(mhi2, mhi3));
+				X86F.Sse2.store_si128((sbyte*)matRows23 + 48, X86F.Sse2.unpackhi_epi8(mhi2, mhi3));
 			}
 
 			// ===== BIT ORDER REVERSAL =====
@@ -519,7 +571,8 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 			float* samples,
 			int edgeMask,
 			bool flipTriangle,
-			byte* materialsPtr
+			byte* matRows01,
+			byte* matRows23
 		)
 		{
 			// ===== BUFFER INDEXING SETUP =====
@@ -564,10 +617,27 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 
 			// ===== MATERIAL ASSIGNMENT =====
 			// Discrete mode is deprecated; choose between blended modes.
-			Color32 materialColor =
-				materialDistributionMode == MaterialDistributionMode.BLENDED_CORNER_SUM
-					? GetVertexMaterialWeightsCornerSum(pos, vertexOffset, materialsPtr)
-					: GetVertexMaterialWeights(pos, vertexOffset, materialsPtr);
+			// Load 8 corner materials from interleaved material rows (mirrors samples indexing)
+			var zzm = pos[2] << 1; // z * 2 for interleaved access
+			var m0 = matRows01[zzm + 0];
+			var m1 = matRows01[zzm + 1];
+			var m2 = matRows23[zzm + 0];
+			var m3 = matRows23[zzm + 1];
+			var m4 = matRows01[zzm + 2];
+			var m5 = matRows01[zzm + 3];
+			var m6 = matRows23[zzm + 2];
+			var m7 = matRows23[zzm + 3];
+
+			var materialColor = GetVertexMaterialWeightsCornerSum_Interleaved(
+				m0,
+				m1,
+				m2,
+				m3,
+				m4,
+				m5,
+				m6,
+				m7
+			);
 
 			// Create and add the new vertex to the output list
 			vertices.Add(
@@ -876,7 +946,6 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 			// The negative sign ensures the normal points outward from the surface.
 			// The scale factor accounts for the voxel value range (-127 to 127).
 			return normal * (-0.002f / voxelSize); // Scale factor: -1/(127*4) approximately
-			// TODO: consider effect of voxelSize
 		}
 
 		/// <summary>
@@ -898,14 +967,13 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 		{
 			// ===== CORNER MATERIAL SAMPLING =====
 			// Sample materials from all 8 corners of the 2x2x2 cube
-			var cornerMaterials = stackalloc byte[8];
+			var cornerMaterialsRaw = stackalloc byte[8];
+			var cornerMaterialsMapped = stackalloc byte[8];
 			var materialWeights = stackalloc float[4];
 
-			// Initialize material weights (direct mapping: materials 0,1,2,3 → RGBA)
 			for (var i = 0; i < 4; i++)
 				materialWeights[i] = 0f;
 
-			// Sample all 8 corners
 			for (var i = 0; i < 8; i++)
 			{
 				var corner = new float3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
@@ -914,47 +982,52 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				var cornerZ = min(pos[2] + (int)corner.z, CHUNK_SIZE - 1);
 				var cornerIndex = (cornerX * CHUNK_SIZE * CHUNK_SIZE) + (cornerY * CHUNK_SIZE) + cornerZ;
 
-				cornerMaterials[i] = (byte)(materialsPtr[cornerIndex] % 4); // Limit to 4 materials
+				var raw = materialsPtr[cornerIndex];
+				cornerMaterialsRaw[i] = raw;
+				cornerMaterialsMapped[i] = (byte)(raw % 4); // Limit to 4 materials
 			}
 
-			// ===== INVERSE DISTANCE WEIGHTING =====
-			// Calculate blend weights using inverse distance from vertex to each corner
-			// Materials 0,1,2,3 map directly to RGBA channels respectively
+			// ===== INVERSE DISTANCE WEIGHTING (skip AIR: raw==0) =====
 			var totalWeight = 0f;
 
 			for (var i = 0; i < 8; i++)
 			{
+				if (cornerMaterialsRaw[i] == MATERIAL_AIR)
+					continue; // skip air
+
 				var corner = new float3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
 				var dist = length(corner - vertexOffset);
 				var weight = 1f / (dist + 0.001f); // Avoid division by zero
 
-				// Accumulate weight directly to the material's channel
-				var cornerMat = cornerMaterials[i];
-				materialWeights[cornerMat] += weight;
+				var mapped = cornerMaterialsMapped[i];
+				materialWeights[mapped] += weight;
 				totalWeight += weight;
 			}
 
 			// ===== NORMALIZATION AND ENCODING =====
-			// Normalize weights to sum to 1.0 and encode in Color32 channels
 			if (totalWeight > 0f)
 				for (var i = 0; i < 4; i++)
 					materialWeights[i] /= totalWeight;
 			else
-				// Fallback: assign full weight to first found material
-				materialWeights[cornerMaterials[0]] = 1f;
+				// Fallback: pick first non-air corner if present
+				for (var i = 0; i < 8; i++)
+					if (cornerMaterialsRaw[i] != MATERIAL_AIR)
+					{
+						materialWeights[cornerMaterialsMapped[i]] = 1f;
+						break;
+					}
 
-			// Encode weights as Color32 (0-255 range)
-			// Direct mapping: R=mat0 weight, G=mat1 weight, B=mat2 weight, A=mat3 weight
 			return new Color32(
-				(byte)(materialWeights[0] * 255f), // Material 0 → R channel
-				(byte)(materialWeights[1] * 255f), // Material 1 → G channel
-				(byte)(materialWeights[2] * 255f), // Material 2 → B channel
-				(byte)(materialWeights[3] * 255f) // Material 3 → A channel
+				(byte)(materialWeights[0] * 255f),
+				(byte)(materialWeights[1] * 255f),
+				(byte)(materialWeights[2] * 255f),
+				(byte)(materialWeights[3] * 255f)
 			);
 		}
 
 		/// <summary>
-		///   Computes multi-material weights for a vertex using corner-sum (counts per material among the 8 cube corners), normalized.
+		///   Computes multi-material weights for a vertex using corner-sum (counts per material among the 8 cube corners),
+		///   normalized.
 		///   This matches the article's approach where per-corner contributions are summed without distance bias.
 		/// </summary>
 		/// <param name="pos">Base coordinates of the 2x2x2 cube in the volume</param>
@@ -968,12 +1041,11 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 			byte* materialsPtr
 		)
 		{
-			var cornerMaterials = stackalloc byte[8];
 			var materialWeights = stackalloc float[4];
-
 			for (var i = 0; i < 4; i++)
 				materialWeights[i] = 0f;
 
+			var contributing = 0f;
 			for (var i = 0; i < 8; i++)
 			{
 				var corner = new float3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
@@ -982,13 +1054,20 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				var cornerZ = min(pos[2] + (int)corner.z, CHUNK_SIZE - 1);
 				var cornerIndex = (cornerX * CHUNK_SIZE * CHUNK_SIZE) + (cornerY * CHUNK_SIZE) + cornerZ;
 
-				cornerMaterials[i] = (byte)(materialsPtr[cornerIndex] % 4);
-				materialWeights[cornerMaterials[i]] += 1f; // equal contribution per corner
+				var raw = materialsPtr[cornerIndex];
+				if (raw == MATERIAL_AIR)
+					continue; // skip AIR
+				var ch = (raw - 1) & 3; // 1->R, 2->G, 3->B, 4->A
+				materialWeights[ch] += 1f;
+				contributing += 1f;
 			}
 
-			// Normalize by total corner count (8)
-			for (var i = 0; i < 4; i++)
-				materialWeights[i] *= (1f / 8f);
+			if (contributing > 0f)
+			{
+				var inv = 1f / contributing;
+				for (var i = 0; i < 4; i++)
+					materialWeights[i] *= inv;
+			}
 
 			return new Color32(
 				(byte)(materialWeights[0] * 255f),
@@ -998,11 +1077,114 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 			);
 		}
 
+		// SIMD-friendly variants that take 8 corner materials directly (already interleaved)
+		//		[SkipLocalsInit]
+		//		static Color32 GetVertexMaterialWeights_Interleaved(
+		//			byte m0,
+		//			byte m1,
+		//			byte m2,
+		//			byte m3,
+		//			byte m4,
+		//			byte m5,
+		//			byte m6,
+		//			byte m7,
+		//			float3 vertexOffset
+		//		)
+		//		{
+		//			// Removed: favor Corner-Sum mode as the single supported fast path
+		//			return new Color32(0, 0, 0, 255);
+		//		}
+
+		[SkipLocalsInit]
+		static Color32 GetVertexMaterialWeightsCornerSum_Interleaved(
+			byte m0,
+			byte m1,
+			byte m2,
+			byte m3,
+			byte m4,
+			byte m5,
+			byte m6,
+			byte m7
+		)
+		{
+			var w0 = 0f;
+			var w1 = 0f;
+			var w2 = 0f;
+			var w3 = 0f;
+			var count = 0f;
+
+			void Acc(byte mat)
+			{
+				if (mat == MATERIAL_AIR)
+					return; // skip AIR
+				var ch = (mat - 1) & 3;
+				switch (ch)
+				{
+					case 0:
+						w0 += 1f;
+						break;
+					case 1:
+						w1 += 1f;
+						break;
+					case 2:
+						w2 += 1f;
+						break;
+					default:
+						w3 += 1f;
+						break;
+				}
+
+				count += 1f;
+			}
+
+			Acc(m0);
+			Acc(m1);
+			Acc(m2);
+			Acc(m3);
+			Acc(m4);
+			Acc(m5);
+			Acc(m6);
+			Acc(m7);
+			if (count > 0f)
+			{
+				var inv = 1f / count;
+				w0 *= inv;
+				w1 *= inv;
+				w2 *= inv;
+				w3 *= inv;
+			}
+
+			return new Color32(
+				(byte)(w0 * 255f),
+				(byte)(w1 * 255f),
+				(byte)(w2 * 255f),
+				(byte)(w3 * 255f)
+			);
+		}
+
+		//		[SkipLocalsInit]
+		//		static byte GetNearestCornerMaterial_Interleaved(
+		//			byte m0,
+		//			byte m1,
+		//			byte m2,
+		//			byte m3,
+		//			byte m4,
+		//			byte m5,
+		//			byte m6,
+		//			byte m7,
+		//			float3 vertexOffset
+		//		)
+		//		{
+		//			// Removed: discrete mode eliminated
+		//			return MATERIAL_AIR;
+		//		}
+
 		[SkipLocalsInit]
 		static unsafe byte GetNearestCornerMaterial(int* pos, float3 vertexOffset, byte* materialsPtr)
 		{
 			byte nearestMat = 0;
 			var nearestDist = float.MaxValue;
+			var foundNonAir = false;
 
 			for (var i = 0; i < 8; i++)
 			{
@@ -1012,15 +1194,20 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				var cornerZ = min(pos[2] + (int)corner.z, CHUNK_SIZE - 1);
 				var cornerIndex = (cornerX * CHUNK_SIZE * CHUNK_SIZE) + (cornerY * CHUNK_SIZE) + cornerZ;
 
+				var mat = materialsPtr[cornerIndex];
+				if (mat == 0)
+					continue; // skip AIR
+
 				var dist = length(corner - vertexOffset);
 				if (dist < nearestDist)
 				{
 					nearestDist = dist;
-					nearestMat = materialsPtr[cornerIndex];
+					nearestMat = mat;
+					foundNonAir = true;
 				}
 			}
 
-			return nearestMat;
+			return foundNonAir ? nearestMat : (byte)0;
 		}
 
 		/// <summary>
