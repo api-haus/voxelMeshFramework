@@ -61,7 +61,6 @@ namespace Voxels.Core.Diagnostics
 			);
 
 			public static readonly ProfilerMarker VoxelStampSystem_Update = new("Voxels/Stamps/Update");
-			public static readonly ProfilerMarker VoxelStampSystem_Query = new("Voxels/Stamps/Query");
 
 			public static readonly ProfilerMarker VoxelStampSystem_Schedule = new(
 				"Voxels/Stamps/Schedule"
@@ -71,11 +70,6 @@ namespace Voxels.Core.Diagnostics
 				"Voxels/Spatial/Update"
 			);
 
-			public static readonly ProfilerMarker VoxelSpatialSystem_BuildHash = new(
-				"Voxels/Spatial/BuildHash"
-			);
-
-			public static readonly ProfilerMarker VoxelSpatialSystem_Add = new("Voxels/Spatial/Add");
 			public static readonly ProfilerMarker VoxelSpatialSystem_Query = new("Voxels/Spatial/Query");
 
 			public static readonly ProfilerMarker EntityInstanceIDLifecycleSystem_Update = new(
@@ -117,10 +111,6 @@ namespace Voxels.Core.Diagnostics
 				"Voxels/Shared/FillEdgeTable"
 			);
 
-			public static readonly ProfilerMarker SharedStaticMeshingResources_Release = new(
-				"Voxels/Shared/Release"
-			);
-
 			public static readonly ProfilerMarker SimpleNoiseVoxelGenerator_Schedule = new(
 				"Voxels/Procedural/SimpleNoise/Schedule"
 			);
@@ -129,16 +119,12 @@ namespace Voxels.Core.Diagnostics
 				"Voxels/Bridge/CreateMeshEntity"
 			);
 
+			public static readonly ProfilerMarker VoxelEntityBridge_TryGetEntityManager = new(
+				"Voxels/Bridge/TryGetEntityManager"
+			);
+
 			public static readonly ProfilerMarker VoxelEntityBridge_CreateGridEntity = new(
 				"Voxels/Bridge/CreateGridEntity"
-			);
-
-			public static readonly ProfilerMarker VoxelEntityBridge_DestroyByInstanceID = new(
-				"Voxels/Bridge/DestroyByInstanceID"
-			);
-
-			public static readonly ProfilerMarker VoxelEntityBridge_DestroyEntity = new(
-				"Voxels/Bridge/DestroyEntity"
 			);
 		}
 	}

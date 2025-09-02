@@ -21,6 +21,7 @@ namespace Voxels.Core.Spatial
 	using EndInitST = Unity.Entities.EndInitializationEntityCommandBufferSystem.Singleton;
 	using float4x4 = Unity.Mathematics.float4x4;
 
+	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[UpdateInGroup(typeof(InitializationSystemGroup))]
 	public partial struct VoxelSpatialSystem : ISystem
 	{
@@ -74,7 +75,6 @@ namespace Voxels.Core.Spatial
 					new SpatialVoxelObject
 					{
 						entity = entity,
-						voxelData = new(voxelMeshRef.ValueRO),
 						localBounds = chunkRef.ValueRO.localBounds,
 						voxelSize = chunkRef.ValueRO.voxelSize,
 						ltw = float4x4.identity, // todo
@@ -103,7 +103,6 @@ namespace Voxels.Core.Spatial
 					new SpatialVoxelObject
 					{
 						entity = entity,
-						voxelData = new(voxelMeshRef.ValueRO),
 						localBounds = obj.localBounds,
 						voxelSize = obj.voxelSize,
 						ltw = ltw.Value,
@@ -164,7 +163,7 @@ namespace Voxels.Core.Spatial
 #endif
 			}
 
-			public NativeArray<SpatialVoxelObject> Query(
+			public NativeList<SpatialVoxelObject> Query(
 				MinMaxAABB queryWorldBounds,
 				Allocator allocator = Allocator.TempJob
 			)
@@ -185,7 +184,7 @@ namespace Voxels.Core.Spatial
 						list.Add(spatialVoxelObject);
 				}
 
-				return list.AsArray();
+				return list;
 			}
 
 			public void Dispose()

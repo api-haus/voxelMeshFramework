@@ -3,7 +3,6 @@ namespace Voxels.Core.Spatial
 	using Unity.Collections;
 	using Unity.Collections.LowLevel.Unsafe;
 	using Unity.Jobs;
-	using static VoxelConstants;
 
 	public struct VoxelVolumeData : INativeDisposable
 	{
@@ -37,7 +36,8 @@ namespace Voxels.Core.Spatial
 
 		public VoxelVolumeData(Allocator allocator = Allocator.Persistent)
 		{
-			const int volumeSize = CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE;
+			const int volumeSize =
+				VoxelConstants.CHUNK_SIZE * VoxelConstants.CHUNK_SIZE * VoxelConstants.CHUNK_SIZE;
 
 			sdfVolume = new(volumeSize, allocator);
 			materials = new(volumeSize, allocator);
@@ -51,13 +51,6 @@ namespace Voxels.Core.Spatial
 					UnsafeUtility.SizeOf<sbyte>() * volumeSize
 				);
 			}
-		}
-
-		public VoxelVolumeData(UnsafeVoxelData unsafeVoxelData, Allocator allocator)
-		{
-			sdfVolume = unsafeVoxelData.GetSDF(allocator);
-			materials = unsafeVoxelData.GetMat(allocator);
-			voxelSize = 1;
 		}
 
 		public void Dispose()

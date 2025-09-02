@@ -22,12 +22,17 @@ namespace Voxels.Core.Meshing
 		internal static void Init()
 		{
 			using var _ = SharedStaticMeshingResources_Init.Auto();
-			EdgeTable = new(256, Allocator.Persistent);
-			VertexAttributes = new(Vertex.VertexFormat, Allocator.Persistent);
 
-			FillEdgeTable();
+			if (!EdgeTable.IsCreated)
+			{
+				EdgeTable = new(256, Allocator.Domain);
+				FillEdgeTable();
+			}
 
-			Application.quitting += Release;
+			if (!VertexAttributes.IsCreated)
+				VertexAttributes = new(Vertex.VertexFormat, Allocator.Domain);
+
+			// Application.quitting += Release;
 		}
 
 		static void FillEdgeTable()
@@ -68,8 +73,9 @@ namespace Voxels.Core.Meshing
 
 		static void Release()
 		{
-			EdgeTable.Dispose();
-			VertexAttributes.Dispose();
+			// TODO: Persistent allocator, and clear before domain reload
+			// EdgeTable.Dispose();
+			// VertexAttributes.Dispose();
 		}
 
 		public struct EdgeTableShared

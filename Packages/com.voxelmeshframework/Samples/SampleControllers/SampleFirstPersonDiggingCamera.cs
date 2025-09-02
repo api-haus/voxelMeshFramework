@@ -44,6 +44,8 @@ namespace Voxels.Samples.SampleControllers
 
 		void Awake()
 		{
+			digAction.action.Enable();
+			placeAction.action.Enable();
 			TryGetComponent(out m_Camera);
 		}
 

@@ -7,10 +7,12 @@ namespace Voxels.Core.Meshing.Systems
 	using Unity.Entities;
 	using Unity.Jobs;
 	using UnityEngine;
+	using Voxels.Core.Concurrency;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 
+	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[RequireMatchingQueriesForUpdate]
 	public partial struct VoxelMeshingSystem : ISystem
 	{
@@ -30,9 +32,6 @@ namespace Voxels.Core.Meshing.Systems
 		{
 			using var _ = VoxelMeshingSystem_Update.Auto();
 
-			var beginProfileJob = state.Dependency;
-			var concurrentJobs = beginProfileJob;
-
 			var ecb = GetSingleton<EndSimST>().CreateCommandBuffer(state.WorldUnmanaged);
 
 			// enqueue
@@ -45,6 +44,10 @@ namespace Voxels.Core.Meshing.Systems
 					.WithEntityAccess()
 			)
 			{
+				// Avoid scheduling reads while volume modifications are still in-flight
+				// if (!VoxelJobFenceRegistry.TryComplete(entity))
+				// continue;
+
 				ref var nvm = ref nativeVoxelMeshRef.ValueRW;
 
 				if (nvm.meshing.meshData.Length == 0)
@@ -71,6 +74,7 @@ namespace Voxels.Core.Meshing.Systems
 				};
 
 				// Schedule appropriate algorithm
+				var pre = VoxelJobFenceRegistry.Get(entity);
 				var meshingJob = algorithm.algorithm switch
 				{
 					VoxelMeshingAlgorithm.NAIVE_SURFACE_NETS => ScheduleNaiveSurfaceNetsWithOptionalFairing(
@@ -78,10 +82,10 @@ namespace Voxels.Core.Meshing.Systems
 						input,
 						output,
 						nvm.meshing.fairing,
-						beginProfileJob
+						pre
 					),
-					VoxelMeshingAlgorithm.DUAL_CONTOURING => beginProfileJob,
-					VoxelMeshingAlgorithm.MARCHING_CUBES => beginProfileJob,
+					VoxelMeshingAlgorithm.DUAL_CONTOURING => pre,
+					VoxelMeshingAlgorithm.MARCHING_CUBES => pre,
 					_ => throw new NotImplementedException(
 						$"Algorithm {algorithm.algorithm} not implemented"
 					),
@@ -96,13 +100,13 @@ namespace Voxels.Core.Meshing.Systems
 					vertices = nvm.meshing.vertices,
 				}.Schedule(meshingJob);
 
-				concurrentJobs = JobHandle.CombineDependencies(meshingJob, concurrentJobs);
+				VoxelJobFenceRegistry.Update(entity, meshingJob);
 
 				ecb.SetComponentEnabled<NeedsRemesh>(entity, false);
 				ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(entity, true);
 			}
 
-			state.Dependency = concurrentJobs;
+			JobHandle.ScheduleBatchedJobs();
 		}
 
 		[BurstCompile]

@@ -7,7 +7,7 @@ namespace Voxels.Core.Meshing.Systems
 	using static Unity.Entities.SystemAPI;
 	using EndInitST = Unity.Entities.EndInitializationEntityCommandBufferSystem.Singleton;
 
-	[RequireMatchingQueriesForUpdate]
+	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[UpdateInGroup(typeof(InitializationSystemGroup))]
 	public partial struct VoxelMeshAllocationSystem : ISystem
 	{
@@ -55,6 +55,8 @@ namespace Voxels.Core.Meshing.Systems
 			)
 				using (VoxelMeshAllocationSystem_Cleanup.Auto())
 				{
+					// ensure background work is finished before disposing native memory
+					Concurrency.VoxelJobFenceRegistry.CompleteAndReset(entity);
 					// dispose
 					nativeVoxelMesh.ValueRW.Dispose();
 					ecb.RemoveComponent<NativeVoxelMesh>(entity);

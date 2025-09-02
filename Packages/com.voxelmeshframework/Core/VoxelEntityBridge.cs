@@ -9,6 +9,7 @@ namespace Voxels.Core
 	using Procedural;
 	using Procedural.Tags;
 	using Unity.Entities;
+	using Unity.Logging;
 	using Unity.Mathematics.Geometry;
 	using Unity.Transforms;
 	using UnityEngine;
@@ -18,8 +19,20 @@ namespace Voxels.Core
 
 	static class VoxelEntityBridge
 	{
-		static EntityManager EntityManager =>
-			World.DefaultGameObjectInjectionWorld?.EntityManager ?? default;
+		public static bool TryGetEntityManager(out EntityManager em)
+		{
+			using var _ = VoxelEntityBridge_TryGetEntityManager.Auto();
+			em = default;
+			var world = World.DefaultGameObjectInjectionWorld;
+			if (!world.IsCreated)
+			{
+				Log.Warning("DefaultGameObjectInjectionWorld is not created!");
+				return false;
+			}
+
+			em = world.EntityManager;
+			return true;
+		}
 
 		// TODO: archetypes
 		public static Entity CreateVoxelMeshEntity(
@@ -28,6 +41,9 @@ namespace Voxels.Core
 			Transform attachTransform = null
 		)
 		{
+			if (!TryGetEntityManager(out var em))
+				return Entity.Null;
+
 			using var _ = VoxelEntityBridge_CreateMeshEntity.Auto();
 			List<ComponentType> types = new(
 				new ComponentType[]
@@ -58,16 +74,16 @@ namespace Voxels.Core
 				types.Add(typeof(NeedsProceduralUpdate));
 			}
 
-			var ent = EntityManager.CreateEntity(types.ToArray());
+			var ent = em.CreateEntity(types.ToArray());
 
-			EntityManager.SetComponentEnabled<NeedsManagedMeshUpdate>(ent, false);
-			EntityManager.SetComponentEnabled<NeedsSpatialUpdate>(ent, true);
-			EntityManager.SetComponentEnabled<NeedsRemesh>(ent, false);
-			EntityManager.SetComponentData(
+			em.SetComponentEnabled<NeedsManagedMeshUpdate>(ent, false);
+			em.SetComponentEnabled<NeedsSpatialUpdate>(ent, true);
+			em.SetComponentEnabled<NeedsRemesh>(ent, false);
+			em.SetComponentData(
 				ent,
 				new EntityGameObjectInstanceIDAttachment { gameObjectInstanceID = instanceId }
 			);
-			EntityManager.SetComponentData(
+			em.SetComponentData(
 				ent,
 				new NativeVoxelObject
 				{
@@ -76,7 +92,7 @@ namespace Voxels.Core
 					localBounds = new MinMaxAABB(0, EFFECTIVE_CHUNK_SIZE * vm.voxelSize),
 				}
 			);
-			EntityManager.SetComponentData(
+			em.SetComponentData(
 				ent,
 				new NativeVoxelMesh.Request
 				{
@@ -84,7 +100,7 @@ namespace Voxels.Core
 					voxelSize = vm.voxelSize,
 				}
 			);
-			EntityManager.SetComponentData(
+			em.SetComponentData(
 				ent,
 				new VoxelMeshingAlgorithmComponent
 				{
@@ -98,33 +114,27 @@ namespace Voxels.Core
 				}
 			);
 
-			EntityManager.SetComponentData(
+			em.SetComponentData(
 				ent,
 				new EntityMeshFilterAttachment { attachTo = vm.GetComponent<MeshFilter>() }
 			);
-			EntityManager.SetComponentData(
-				ent,
-				new LocalToWorld { Value = vm.transform.localToWorldMatrix }
-			);
-			EntityManager.SetComponentData(ent, new NeedsSpatialUpdate { persistent = attachTransform });
+			em.SetComponentData(ent, new LocalToWorld { Value = vm.transform.localToWorldMatrix });
+			em.SetComponentData(ent, new NeedsSpatialUpdate { persistent = attachTransform });
 
 			if (attachTransform)
-				EntityManager.SetComponentData(
+				em.SetComponentData(
 					ent,
 					new EntityGameObjectTransformAttachment { attachTo = attachTransform }
 				);
 			if (meshCollider)
-				EntityManager.SetComponentData(
-					ent,
-					new EntityMeshColliderAttachment { attachTo = meshCollider }
-				);
+				em.SetComponentData(ent, new EntityMeshColliderAttachment { attachTo = meshCollider });
 			if (vm.procedural)
 			{
-				EntityManager.SetComponentData(
+				em.SetComponentData(
 					ent,
 					new PopulateWithProceduralVoxelGenerator { generator = vm.procedural }
 				);
-				EntityManager.SetComponentEnabled<NeedsProceduralUpdate>(ent, true);
+				em.SetComponentEnabled<NeedsProceduralUpdate>(ent, true);
 			}
 
 			return ent;
@@ -136,6 +146,9 @@ namespace Voxels.Core
 			Transform attachTransform = null
 		)
 		{
+			if (!TryGetEntityManager(out var em))
+				return Entity.Null;
+
 			using var _ = VoxelEntityBridge_CreateGridEntity.Auto();
 			List<ComponentType> types = new(
 				new ComponentType[]
@@ -156,9 +169,9 @@ namespace Voxels.Core
 				types.Add(typeof(NeedsProceduralUpdate));
 			}
 
-			var ent = EntityManager.CreateEntity(types.ToArray());
+			var ent = em.CreateEntity(types.ToArray());
 
-			EntityManager.SetComponentData(
+			em.SetComponentData(
 				ent,
 				new NativeVoxelGrid
 				{
@@ -168,15 +181,12 @@ namespace Voxels.Core
 					bounds = new(vmg.worldBounds.min, vmg.worldBounds.max),
 				}
 			);
-			EntityManager.SetComponentData(
+			em.SetComponentData(
 				ent,
 				new EntityGameObjectInstanceIDAttachment { gameObjectInstanceID = instanceId }
 			);
-			EntityManager.SetComponentData(
-				ent,
-				new LocalToWorld { Value = vmg.transform.localToWorldMatrix }
-			);
-			EntityManager.SetComponentData(
+			em.SetComponentData(ent, new LocalToWorld { Value = vmg.transform.localToWorldMatrix });
+			em.SetComponentData(
 				ent,
 				new LocalTransform
 				{
@@ -185,20 +195,20 @@ namespace Voxels.Core
 					Scale = cmax(vmg.transform.localScale),
 				}
 			);
-			EntityManager.SetComponentData(ent, new NeedsSpatialUpdate { persistent = attachTransform });
+			em.SetComponentData(ent, new NeedsSpatialUpdate { persistent = attachTransform });
 
 			if (attachTransform)
-				EntityManager.SetComponentData(
+				em.SetComponentData(
 					ent,
 					new EntityGameObjectTransformAttachment { attachTo = attachTransform }
 				);
 			if (vmg.procedural)
 			{
-				EntityManager.SetComponentData(
+				em.SetComponentData(
 					ent,
 					new PopulateWithProceduralVoxelGenerator { generator = vmg.procedural }
 				);
-				EntityManager.SetComponentEnabled<NeedsProceduralUpdate>(ent, true);
+				em.SetComponentEnabled<NeedsProceduralUpdate>(ent, true);
 			}
 
 			return ent;
@@ -206,12 +216,14 @@ namespace Voxels.Core
 
 		public static void DestroyEntityByInstanceID(int gameObjectInstanceID)
 		{
-			if (EntityManager.Equals(default))
+			if (!TryGetEntityManager(out var em))
 				return;
-			using var _ = VoxelEntityBridge_DestroyByInstanceID.Auto();
-			var entity = EntityManager.CreateEntity(typeof(DestroyEntityByInstanceIDEvent));
 
-			EntityManager.SetComponentData(
+			if (em.Equals(default))
+				return;
+			var entity = em.CreateEntity(typeof(DestroyEntityByInstanceIDEvent));
+
+			em.SetComponentData(
 				entity,
 				new DestroyEntityByInstanceIDEvent { gameObjectInstanceID = gameObjectInstanceID }
 			);
@@ -219,10 +231,10 @@ namespace Voxels.Core
 
 		public static void DestroyEntity(Entity ent)
 		{
-			if (EntityManager.Equals(default))
+			if (!TryGetEntityManager(out var em))
 				return;
-			using var _ = VoxelEntityBridge_DestroyEntity.Auto();
-			EntityManager.DestroyEntity(ent);
+
+			em.DestroyEntity(ent);
 		}
 	}
 }

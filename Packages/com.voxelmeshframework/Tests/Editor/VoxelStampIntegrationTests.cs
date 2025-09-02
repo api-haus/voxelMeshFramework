@@ -22,7 +22,6 @@ namespace Voxels.Tests.Editor
 				var spatial = new SpatialVoxelObject
 				{
 					entity = default,
-					voxelData = new UnsafeVoxelData(volume),
 					localBounds = new MinMaxAABB(float3.zero, new float3(CHUNK_SIZE)),
 					voxelSize = 1f,
 					ltw = float4x4.identity,

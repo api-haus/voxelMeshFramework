@@ -4,10 +4,12 @@ namespace Voxels.Core.Meshing.Systems
 	using Tags;
 	using Unity.Burst;
 	using Unity.Entities;
+	using Voxels.Core.Concurrency;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 
+	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[RequireMatchingQueriesForUpdate]
 	[UpdateAfter(typeof(VoxelMeshingSystem))]
 	public partial class ManagedVoxelMeshingSystem : SystemBase
@@ -27,6 +29,9 @@ namespace Voxels.Core.Meshing.Systems
 			)
 				using (ManagedVoxelMeshingSystem_ApplyMesh.Auto())
 				{
+					// Only proceed when the per-entity fence is complete
+					if (!VoxelJobFenceRegistry.TryComplete(entity))
+						continue;
 					ref var nvm = ref nativeVoxelMeshRef.ValueRW;
 					nvm.ApplyMeshManaged();
 					ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(entity, false);
@@ -34,14 +39,17 @@ namespace Voxels.Core.Meshing.Systems
 
 			// attach w/ mesh filter
 			foreach (
-				var (nativeVoxelMeshRef, meshFilterAttachment) in Query<
+				var (nativeVoxelMeshRef, meshFilterAttachment, entity) in Query<
 					RefRW<NativeVoxelMesh>,
 					EntityMeshFilterAttachment
 				>()
 					.WithAll<NeedsManagedMeshUpdate>()
+					.WithEntityAccess()
 			)
 				using (ManagedVoxelMeshingSystem_AttachMeshFilter.Auto())
 				{
+					if (!VoxelJobFenceRegistry.TryComplete(entity))
+						continue;
 					ref var nvm = ref nativeVoxelMeshRef.ValueRW;
 					var indexCount = nvm.meshing.indices.Length;
 					var hasMesh = indexCount > 16;
@@ -50,14 +58,17 @@ namespace Voxels.Core.Meshing.Systems
 
 			// attach w/ mesh collider
 			foreach (
-				var (nativeVoxelMeshRef, meshColliderAttachment) in Query<
+				var (nativeVoxelMeshRef, meshColliderAttachment, entity) in Query<
 					RefRW<NativeVoxelMesh>,
 					EntityMeshColliderAttachment
 				>()
 					.WithAll<NeedsManagedMeshUpdate>()
+					.WithEntityAccess()
 			)
 				using (ManagedVoxelMeshingSystem_AttachMeshCollider.Auto())
 				{
+					if (!VoxelJobFenceRegistry.TryComplete(entity))
+						continue;
 					ref var nvm = ref nativeVoxelMeshRef.ValueRW;
 					var indexCount = nvm.meshing.indices.Length;
 					var hasMesh = indexCount > 16;

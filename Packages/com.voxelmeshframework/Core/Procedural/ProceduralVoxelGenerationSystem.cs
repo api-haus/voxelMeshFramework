@@ -8,6 +8,7 @@ namespace Voxels.Core.Procedural
 	using Unity.Jobs;
 	using Unity.Mathematics;
 	using Unity.Transforms;
+	using Voxels.Core.Concurrency;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using static Unity.Mathematics.Geometry.Math;
@@ -20,8 +21,7 @@ namespace Voxels.Core.Procedural
 		{
 			using var _ = ProceduralVoxelGenerationSystem_Update.Auto();
 
-			var beginProfileJob = Dependency;
-			var concurrentJobs = beginProfileJob;
+			var concurrentJobs = default(JobHandle);
 
 			var ecb = SystemAPI.GetSingleton<EndSimST>().CreateCommandBuffer(World.Unmanaged);
 
@@ -43,15 +43,21 @@ namespace Voxels.Core.Procedural
 				ref readonly var mesh = ref voxelMeshRef.ValueRO;
 				ref readonly var voxelObject = ref voxelObjectRef.ValueRO;
 
+				// Avoid scheduling writes while previous work for this entity is still in-flight
+				if (!VoxelJobFenceRegistry.TryComplete(entity))
+					continue;
+
 				using (ProceduralVoxelGenerationSystem_Schedule.Auto())
 				{
+					var pre = VoxelJobFenceRegistry.Get(entity);
 					var job = pcg.generator.Schedule(
 						Transform((float3x3)ltw.Value, voxelObject.localBounds),
 						voxelObject.voxelSize,
 						mesh.volume,
-						beginProfileJob
+						pre
 					);
 
+					VoxelJobFenceRegistry.Update(entity, job);
 					concurrentJobs = JobHandle.CombineDependencies(job, concurrentJobs);
 				}
 
@@ -59,7 +65,7 @@ namespace Voxels.Core.Procedural
 				ecb.SetComponentEnabled<NeedsRemesh>(entity, true);
 			}
 
-			Dependency = concurrentJobs;
+			JobHandle.ScheduleBatchedJobs();
 		}
 	}
 }

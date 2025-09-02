@@ -1,21 +1,18 @@
 namespace Voxels
 {
+	using Core;
 	using Core.Stamps;
-	using Unity.Entities;
 
 	public static class VoxelAPI
 	{
-		static EntityManager EntityManager =>
-			World.DefaultGameObjectInjectionWorld?.EntityManager ?? default;
-
 		public static void Stamp(NativeVoxelStampProcedural stamp)
 		{
-			if (EntityManager.Equals(default))
+			if (!VoxelEntityBridge.TryGetEntityManager(out var em))
 				return;
 
-			var ent = EntityManager.CreateEntity(typeof(NativeVoxelStampProcedural));
+			var ent = em.CreateEntity(typeof(NativeVoxelStampProcedural));
 
-			EntityManager.SetComponentData(ent, stamp);
+			em.SetComponentData(ent, stamp);
 		}
 	}
 }

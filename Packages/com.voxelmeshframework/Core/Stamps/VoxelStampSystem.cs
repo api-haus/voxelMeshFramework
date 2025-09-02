@@ -8,6 +8,7 @@ namespace Voxels.Core.Stamps
 	using Unity.Entities;
 	using Unity.Jobs;
 	using UnityEngine;
+	using Voxels.Core.Concurrency;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
@@ -16,6 +17,7 @@ namespace Voxels.Core.Stamps
 	using Debugging;
 #endif
 
+	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[UpdateBefore(typeof(VoxelMeshingSystem))]
 	public partial struct VoxelStampSystem : ISystem
 	{
@@ -41,7 +43,6 @@ namespace Voxels.Core.Stamps
 			using var stamps = m_StampQuery.ToComponentDataArray<NativeVoxelStampProcedural>(
 				Allocator.TempJob
 			);
-			var concurrentStampJobs = state.Dependency;
 
 			foreach (var stamp in stamps)
 			{
@@ -59,11 +60,19 @@ namespace Voxels.Core.Stamps
 
 				foreach (var spatialVoxelObject in chunksInBounds)
 				{
-					var sdf = spatialVoxelObject.voxelData.GetSDF();
-					var mat = spatialVoxelObject.voxelData.GetMat();
+					// Use the entity's NativeVoxelMesh buffers directly to preserve safety handles
+					var nvmRw = GetComponentRW<Meshing.NativeVoxelMesh>(spatialVoxelObject.entity);
+					ref var nvm = ref nvmRw.ValueRW;
+					var sdf = nvm.volume.sdfVolume;
+					var mat = nvm.volume.materials;
 
 					using (VoxelStampSystem_Schedule.Auto())
 					{
+						// Avoid scheduling writes while previous work for this entity is still in-flight
+						if (!VoxelJobFenceRegistry.TryComplete(spatialVoxelObject.entity))
+							continue;
+
+						var pre = VoxelJobFenceRegistry.Get(spatialVoxelObject.entity);
 						var applyStampJob = new ApplyVoxelStampJob
 						{
 							//
@@ -74,9 +83,9 @@ namespace Voxels.Core.Stamps
 							volumeLTW = spatialVoxelObject.ltw,
 							volumeWtl = spatialVoxelObject.wtl,
 							voxelSize = spatialVoxelObject.voxelSize,
-						}.Schedule(state.Dependency);
+						}.Schedule(pre);
 
-						concurrentStampJobs = JobHandle.CombineDependencies(concurrentStampJobs, applyStampJob);
+						VoxelJobFenceRegistry.Update(spatialVoxelObject.entity, applyStampJob);
 					}
 
 #if ALINE && DEBUG
@@ -96,9 +105,7 @@ namespace Voxels.Core.Stamps
 				}
 			}
 
-			state.Dependency = concurrentStampJobs;
-			// state.Dependency = stamps.Dispose(state.Dependency);
-
+			JobHandle.ScheduleBatchedJobs();
 			ecb.DestroyEntity(m_StampQuery, EntityQueryCaptureMode.AtPlayback);
 		}
 

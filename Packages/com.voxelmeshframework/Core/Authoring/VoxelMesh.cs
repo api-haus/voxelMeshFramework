@@ -50,7 +50,6 @@ namespace Voxels.Core.Authoring
 
 		void Awake()
 		{
-			// TODO: work around issue when Undo in Play Mode leads to de-linking and a runtime entity error
 			this.CreateVoxelMeshEntity(
 				gameObject.GetInstanceID(),
 				transformAttachment ? transform : null

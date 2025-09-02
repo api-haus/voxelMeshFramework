@@ -16,7 +16,6 @@ namespace Voxels.Tests.Editor
 			return new SpatialVoxelObject
 			{
 				entity = new Entity { Index = 1, Version = 1 },
-				voxelData = default,
 				localBounds = localBounds,
 				voxelSize = voxelSize,
 				ltw = ltw,

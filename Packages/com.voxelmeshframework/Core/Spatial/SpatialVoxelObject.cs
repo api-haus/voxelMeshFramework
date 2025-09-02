@@ -7,7 +7,6 @@ namespace Voxels.Core.Spatial
 	public struct SpatialVoxelObject
 	{
 		public MinMaxAABB localBounds;
-		public UnsafeVoxelData voxelData;
 		public Entity entity;
 		public float voxelSize;
 		public float4x4 ltw;

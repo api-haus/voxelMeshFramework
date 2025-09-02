@@ -76,8 +76,6 @@ namespace Voxels.Core.Stamps
 
 				var weight = saturate(1f - (sqrt(d2) * invRadius));
 
-				volumeMaterials[ptr] = (byte)select((int)MATERIAL_AIR, stamp.material, stamp.strength >= 0);
-
 				volumeSdf[ptr] = (sbyte)clamp(
 					//
 					round(
@@ -91,6 +89,7 @@ namespace Voxels.Core.Stamps
 					-127,
 					127
 				);
+				volumeMaterials[ptr] = (byte)select((int)MATERIAL_AIR, stamp.material, volumeSdf[ptr] >= 0);
 			}
 		}
 	}
