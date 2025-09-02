@@ -19,7 +19,7 @@
 ### Goals (Phase 1)
 - Non-resizable, transformable grid root entity created at runtime through `VoxelEntityBridge`.
 - Spawn a fixed set of chunk entities parented to the grid and positioned at 30-voxel increments multiplied by `voxelSize`.
-- Meshing pipeline that consumes chunk work in the background with no sync points (deferred job arrays + ECB).
+- Meshing pipeline that consumes chunk work in the background with no sync points (deferred job arrays + ECB). This must be already implemented, as long as Chunks receive a valid NativeVoxelMesh.Request component, allocated by VoxelMeshAllocationSystem.
 - Extensible policy layer for grid spacing/apron rules (Surface Nets policy now; future algorithms later).
 
 ### Use Cases: Movable Voxel Volumes
@@ -32,9 +32,11 @@
 flowchart TD
     A["MonoBehaviour VoxelMeshGrid"] -->|Awake| B["VoxelEntityBridge.CreateVoxelMeshGridEntity"]
     B --> C["Grid Root Entity<br/>(LocalTransform, LocalToWorld, NativeVoxelGrid)"]
+    C --> K["GridNeedsTagPropagationSystem<br/>(propagate grid Needs* to chunks)"]
     C --> D["GridInitializationSystem<br/>(ECB: create chunks, Parent to Grid, set LocalTransform)"]
     D --> E["Chunk Entities<br/>(Chunk, ChunkCoord, ChunkBounds, Parent, LocalTransform)"]
-    E --> F["MeshingQueueSystem<br/>(collect NeedsRemesh-enabled entities)"]
+    K --> E
+    E --> F["MeshingQueueSystem<br/>(collect Chunk entities with NeedsRemesh)"]
     F --> G["NaiveSurfaceNetsScheduleSystem<br/>(schedule jobs, toggle NeedsRemesh/NeedsManagedMeshUpdate)"]
     G --> H["Mesh Writeback/Update<br/>(NeedsManagedMeshUpdate/NeedsRemesh)"]
     E --> I["GridSpatialRegistrationSystem<br/>(register/update spatial index)"]
@@ -79,6 +81,25 @@ using Unity.Entities; using Unity.Mathematics.Geometry;
 public struct ChunkBounds : IComponentData { public MinMaxAABB LocalBounds; }
 ```
 
+### Needs* Tag Propagation
+
+- Purpose: One-shot broadcast from the grid root to all owned chunks for enableable lifecycle tags.
+- Tags propagated from grid → chunks:
+  - `NeedsRemesh`
+  - `NeedsManagedMeshUpdate`
+  - `NeedsSpatialUpdate`
+- Tags not propagated:
+  - `NeedsChunkAllocation` (grid-only lifecycle)
+  - `ChunkMeshingInFlight` (chunk-only lifecycle)
+- Semantics:
+  - Enabling an applicable `Needs*` tag on the grid triggers a fanout that enables the same tag on every child chunk (idempotent).
+  - After fanout is enqueued via ECB, the grid tag is cleared (consumed) to avoid re-queuing.
+  - New chunks created later inherit any currently enabled grid tags at creation time (see GridChunkAllocationSystem).
+- Implementation notes:
+  - Iterate children via `LinkedEntityGroup`; skip element 0 (the root).
+  - Use `WithChangeFilter` on the grid tags to only process on state changes.
+  - Use `ECB.ParallelWriter` to enable tags on children; no fences are mutated.
+
 ### Systems (new)
 All systems follow the Jobs scheduling and HPC#/Burst rules:
 - Schedule jobs from the managing thread only, never inside jobs.
@@ -97,13 +118,13 @@ All systems follow the Jobs scheduling and HPC#/Burst rules:
     - `Position = (gridLocalOrigin + (coord * 30) * voxelSize)`; `Rotation = identity`; `Scale = 1`.
   - Add `Chunk`, `ChunkCoord`, `ChunkBounds` (local bounds in grid space), and `ChunkMeshingRequest`.
   - Ensure the grid root has a `LinkedEntityGroup` buffer and append each created chunk entity to it.
-  - Optionally enable `NeedsRemesh` on the new chunks to queue initial meshing.
+  - Enable any applicable `Needs*` currently enabled on the grid (`NeedsRemesh`/`NeedsManagedMeshUpdate`/`NeedsSpatialUpdate`) so new chunks inherit broadcast state.
   - Disable `NeedsChunkAllocation` on success.
 - Notes: No baking; called at runtime after `VoxelEntityBridge` creates the grid root entity.
 
 2) MeshingQueueSystem
 - Purpose: Build a deferred work list of entities requiring meshing, unified across objects, grids, and chunks.
-- Query: entities with `NeedsRemesh` enabled; optionally filter by visibility/dirty flags.
+- Query: chunk entities (`WithAll<Chunk>`) with `NeedsRemesh` enabled; optionally filter by visibility/dirty flags.
 - Output: `NativeList<Entity>` exposed as `AsDeferredJobArray()` to downstream stages.
 - No sync points; only dependency chaining.
  - Fencing: queueing does not mutate fences; downstream schedulers will read/update via `VoxelJobFenceRegistry`.
@@ -157,6 +178,31 @@ All systems follow the Jobs scheduling and HPC#/Burst rules:
   - Rely on Unity’s Transform parenting to propagate the grid transform to chunk GOs (no ECS→GO transform sync needed).
   - On destruction, `LinkedEntityGroup` handles chunk entity lifetime; the managed system should destroy corresponding GOs if needed (or rely on parent GO destruction).
 
+7) GridNeedsTagPropagationSystem
+- Purpose: Mirror grid-level `Needs*` tags to all owned chunk entities and consume the grid tags.
+- Query:
+  - Grids with `LinkedEntityGroup` and any of `NeedsRemesh`, `NeedsManagedMeshUpdate`, or `NeedsSpatialUpdate` changed/enabled.
+- Behavior:
+  - For each matching grid, iterate its `LinkedEntityGroup` (skip index 0/root) and enable the corresponding tag on each child that has `Chunk`.
+  - Clear the processed tag on the grid via `ECB.SetComponentEnabled<T>(grid, false)` to consume the broadcast.
+  - Use `ECB.ParallelWriter` for scalability; this system does not read or update per-chunk fences.
+- Ordering:
+  - Run after `GridChunkAllocationSystem` so newly created chunks are included in the fanout.
+  - Run before `MeshingQueueSystem` so propagated `NeedsRemesh` states are visible to the queue builder.
+- Conceptual snippet:
+```csharp
+// For each grid root 'g' with LinkedEntityGroup 'leg'
+if (SystemAPI.IsComponentEnabled<NeedsRemesh>(g))
+{
+    for (int i = 1; i < leg.Length; i++)
+    {
+        var e = leg[i].Value;
+        if (SystemAPI.HasComponent<Chunk>(e)) ecb.SetComponentEnabled<NeedsRemesh>(e, true);
+    }
+    ecb.SetComponentEnabled<NeedsRemesh>(g, false); // consume
+}
+```
+
 ### Placement and Transforms
 - Grid root entity has `LocalTransform` mirrored from `VoxelMeshGrid` authoring (via `VoxelEntityBridge`).
 - Chunks are parented to the grid entity (`Parent`) and hold their own `LocalTransform` with positions stepping by `effectiveChunkSize * voxelSize` (30-increments).
@@ -182,6 +228,7 @@ var world = Unity.Mathematics.Geometry.Math.Transform(gridL2W, local);
 - Record all structural changes in ECB/ParallelWriter; play back after dependent jobs complete.
 - Call `JobHandle.ScheduleBatchedJobs()` after batching schedules; avoid `.Complete()` except where results are required at boundaries.
  - Use `VoxelJobFenceRegistry` to read the current fence for each entity before scheduling and to update it with the returned job handle; only complete at managed apply boundaries.
+ - Propagation uses only ECB writes; it does not participate in per-entity job fences.
 
 ### Burst/HPC# Constraints (hot paths)
 - Entry points are static, `[BurstCompile]`, unmanaged-only parameters.
@@ -245,6 +292,7 @@ JobHandle.ScheduleBatchedJobs();
 - Visual seam tests across chunk borders with varying grid transforms.
 - Stress tests on meshing throughput with many chunks; verify no main-thread stalls.
 - Spatial registration correctness: bounds updates and culling behavior.
+ - Propagation correctness: enabling grid-level `NeedsRemesh`/`NeedsManagedMeshUpdate`/`NeedsSpatialUpdate` propagates to all child chunks and clears on the grid; newly created chunks inherit active tags.
 
 ### Roadmap
 1) Rolling Grid (next step)

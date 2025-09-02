@@ -66,6 +66,7 @@ namespace Voxels.Core.Meshing
 		public NativeList<int3> cellCoords;
 		public NativeList<int> cellLinearIndex;
 		public NativeList<byte> materialIds;
+		public NativeList<float4> materialWeights;
 		public NativeArray<int> cellToVertex; // Dense array sized CHUNK_SIZE^3
 		public NativeList<int2> neighborIndexRanges;
 		public NativeList<int> neighborIndices;
@@ -82,6 +83,7 @@ namespace Voxels.Core.Meshing
 			cellCoords = new NativeList<int3>(initialVertexCapacity, allocator);
 			cellLinearIndex = new NativeList<int>(initialVertexCapacity, allocator);
 			materialIds = new NativeList<byte>(initialVertexCapacity, allocator);
+			materialWeights = new NativeList<float4>(initialVertexCapacity, allocator);
 			cellToVertex = new NativeArray<int>(totalCells, allocator); // Keep as fixed-size dense array
 			neighborIndexRanges = new NativeList<int2>(initialVertexCapacity, allocator);
 			neighborIndices = new NativeList<int>(initialVertexCapacity * 6, allocator); // Max 6 face neighbors
@@ -95,6 +97,7 @@ namespace Voxels.Core.Meshing
 			cellCoords.Dispose();
 			cellLinearIndex.Dispose();
 			materialIds.Dispose();
+			materialWeights.Dispose();
 			if (cellToVertex.IsCreated)
 				cellToVertex.Dispose();
 			neighborIndexRanges.Dispose();
@@ -109,6 +112,7 @@ namespace Voxels.Core.Meshing
 			inputDeps = cellCoords.Dispose(inputDeps);
 			inputDeps = cellLinearIndex.Dispose(inputDeps);
 			inputDeps = materialIds.Dispose(inputDeps);
+			inputDeps = materialWeights.Dispose(inputDeps);
 			if (cellToVertex.IsCreated)
 				inputDeps = cellToVertex.Dispose(inputDeps);
 			inputDeps = neighborIndexRanges.Dispose(inputDeps);

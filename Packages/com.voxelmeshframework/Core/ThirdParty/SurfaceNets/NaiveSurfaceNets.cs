@@ -110,11 +110,10 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 		public UnsafePointer<MinMaxAABB> bounds;
 
 		/// <summary>
-		///   Flag indicating whether to recalculate normals from triangle geometry
-		///   or use the gradient-based normals calculated during vertex generation.
-		///   Triangle-based normals are more accurate but computationally expensive.
+		///   Controls how normals are produced during/after meshing.
+		///   Prefer GRADIENT for speed, TRIANGLE_GEOMETRY for quality, or NONE to skip normals.
 		/// </summary>
-		public bool recalculateNormals;
+		public NormalsMode normalsMode;
 
 		public float voxelSize;
 
@@ -141,7 +140,7 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 			ProcessVoxels();
 
 			// Optionally recalculate normals from triangle geometry for higher quality
-			if (recalculateNormals)
+			if (normalsMode == NormalsMode.TRIANGLE_GEOMETRY)
 				RecalculateNormals();
 		}
 
@@ -644,10 +643,11 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				new Vertex
 				{
 					position = position,
-					// Choose normal calculation method based on flags
-					normal = recalculateNormals
-						? float3.zero
-						: GetVertexNormalFromSamples(samples, voxelSize),
+					// Choose normal calculation method based on normals mode
+					normal =
+						normalsMode == NormalsMode.GRADIENT
+							? GetVertexNormalFromSamples(samples, voxelSize)
+							: float3.zero,
 					// Encode materials per configuration
 					color = materialColor,
 				}

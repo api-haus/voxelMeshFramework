@@ -26,7 +26,7 @@ namespace Voxels.Core.Meshing
 				indices = output.indices,
 				vertices = output.vertices,
 				bounds = output.bounds,
-				recalculateNormals = input.recalculateNormals,
+				normalsMode = input.normalsMode,
 				voxelSize = input.voxelSize,
 				materialDistributionMode = input.materialDistributionMode,
 			};

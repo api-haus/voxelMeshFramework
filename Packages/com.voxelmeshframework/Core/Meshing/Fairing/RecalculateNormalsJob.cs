@@ -25,136 +25,68 @@ namespace Voxels.Core.Meshing.Fairing
 	public struct RecalculateNormalsJob : IJob
 	{
 		/// <summary>
-		/// Triangle indices (every 3 indices form a triangle).
+		/// Triangle indices (every 6 indices form two triangles of a quad in Surface Nets).
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeArray<int> indices;
 
 		/// <summary>
-		/// Input vertex positions after fairing.
+		/// Vertices to read positions from and write normals to (in place).
 		/// </summary>
 		[NoAlias]
-		[ReadOnly]
-		public NativeArray<float3> positions;
-
-		/// <summary>
-		/// Output recalculated normals.
-		/// </summary>
-		[NoAlias]
-		public NativeList<float3> normals;
-
-		/// <summary>
-		/// Input vertices for position data.
-		/// </summary>
-		[NoAlias]
-		[ReadOnly]
 		public NativeList<Vertex> vertices;
-
-		/// <summary>
-		/// Number of vertices to process.
-		/// </summary>
-		[ReadOnly]
-		public int vertexCount;
 
 		public void Execute()
 		{
-			// Process all triangles sequentially to avoid atomic operations
-			var triangleCount = indices.Length / 6;
-
-			for (var triangleIndex = 0; triangleIndex < triangleCount; triangleIndex++)
+			// Accumulate face normals directly into vertex normals, then normalize in place.
+			// Follows NaiveSurfaceNets.RecalculateNormals without preliminary clearing.
+			var indicesLength = indices.Length;
+			for (var baseIndex = 0; baseIndex + 5 < indicesLength; baseIndex += 6)
 			{
-				// ===== TRIANGLE INDICES =====
-				// Surface Nets generates triangles in groups of 6 indices (2 triangles forming a quad).
-				// Process triangles in pairs for efficiency.
-				var baseIndex = triangleIndex * 6;
+				var idx0 = indices[baseIndex + 0];
+				var idx1 = indices[baseIndex + 1];
+				var idx2 = indices[baseIndex + 2];
+				var idx3 = indices[baseIndex + 4];
 
-				// Ensure we don't exceed the index array bounds
-				if (baseIndex + 5 >= indices.Length)
-					continue;
+				var v0 = vertices[idx0];
+				var v1 = vertices[idx1];
+				var v2 = vertices[idx2];
+				var v3 = vertices[idx3];
 
-				// ===== VERTEX INDEX EXTRACTION =====
-				// Extract the 4 unique vertex indices from the 6 triangle indices.
-				var idx0 = indices[baseIndex + 0]; // Shared vertex
-				var idx1 = indices[baseIndex + 1]; // Shared vertex
-				var idx2 = indices[baseIndex + 2]; // Unique to first triangle
-				var idx3 = indices[baseIndex + 4]; // Unique to second triangle
+				var edge01 = v1.position - v0.position;
+				var edge02 = v2.position - v0.position;
+				var edge03 = v3.position - v0.position;
 
-				// ===== VERTEX POSITION RETRIEVAL =====
-				var pos0 = positions[idx0];
-				var pos1 = positions[idx1];
-				var pos2 = positions[idx2];
-				var pos3 = positions[idx3];
+				var normal0 = cross(edge01, edge02);
+				var normal1 = cross(edge03, edge01);
 
-				// ===== EDGE VECTOR CALCULATION =====
-				var edge01 = pos1 - pos0; // Shared edge
-				var edge02 = pos2 - pos0; // Edge to first triangle's unique vertex
-				var edge03 = pos3 - pos0; // Edge to second triangle's unique vertex
-
-				// ===== TRIANGLE NORMAL CALCULATION =====
-				// Calculate face normals using cross products.
-				var normal0 = cross(edge01, edge02); // First triangle normal
-				var normal1 = cross(edge03, edge01); // Second triangle normal
-
-				// ===== NaN PROTECTION =====
-				// Handle degenerate triangles that produce invalid normals.
 				if (any(isnan(normal0)))
 					normal0 = new float3(0, 0, 0);
 				if (any(isnan(normal1)))
 					normal1 = new float3(0, 0, 0);
 
-				// ===== NORMAL ACCUMULATION =====
-				// Accumulate normals to vertices. Sequential processing eliminates need for atomic operations.
-				// Shared vertices receive contributions from both triangles.
-				normals[idx0] = normals[idx0] + normal0 + normal1;
-				normals[idx1] = normals[idx1] + normal0 + normal1;
-				normals[idx2] = normals[idx2] + normal0;
-				normals[idx3] = normals[idx3] + normal1;
+				v0.normal = v0.normal + normal0 + normal1;
+				v1.normal = v1.normal + normal0 + normal1;
+				v2.normal = v2.normal + normal0;
+				v3.normal = v3.normal + normal1;
+
+				vertices[idx0] = v0;
+				vertices[idx1] = v1;
+				vertices[idx2] = v2;
+				vertices[idx3] = v3;
 			}
-		}
-	}
 
-	/// <summary>
-	/// Normalizes accumulated vertex normals after triangle normal accumulation.
-	/// This job must run after RecalculateNormalsJob to finalize the normals.
-	/// </summary>
-	[BurstCompile(
-		Debug = false,
-		FloatMode = FloatMode.Fast,
-		OptimizeFor = OptimizeFor.Performance,
-		FloatPrecision = FloatPrecision.Low,
-		DisableSafetyChecks = true,
-		CompileSynchronously = true
-	)]
-	public struct NormalizeNormalsJob : IJob
-	{
-		/// <summary>
-		/// Accumulated normals to be normalized.
-		/// </summary>
-		[NoAlias]
-		public NativeList<float3> normals;
-
-		/// <summary>
-		/// Input vertices to get count from.
-		/// </summary>
-		[NoAlias]
-		[ReadOnly]
-		public NativeList<Vertex> vertices;
-
-		public void Execute()
-		{
-			var vertexCount = vertices.Length;
-			for (var vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++)
+			var count = vertices.Length;
+			for (var i = 0; i < count; i++)
 			{
-				var normal = normals[vertexIndex];
-				var normalLength = length(normal);
-
-				// ===== NORMALIZATION WITH SAFETY CHECK =====
-				// Avoid division by zero for zero-length normals.
-				if (normalLength > 0.0001f)
-					normals[vertexIndex] = normal / normalLength;
+				var v = vertices[i];
+				var len = length(v.normal);
+				if (len > 0.0001f)
+					v.normal = v.normal / len;
 				else
-					normals[vertexIndex] = new float3(0, 0, 0);
+					v.normal = new float3(0, 0, 0);
+				vertices[i] = v;
 			}
 		}
 	}

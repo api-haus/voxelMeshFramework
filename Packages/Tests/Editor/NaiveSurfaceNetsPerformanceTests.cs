@@ -26,36 +26,52 @@ namespace Voxels.Tests.Editor
 
 		[Test]
 		[Performance]
-		public void SurfaceNets_Sphere_RecalcNormals_Off()
+		public void SurfaceNets_Sphere_GradientNormals()
 		{
-			RunSurfaceNetsPerfTest(CreateSphereSdf(16f, 16f, 16f, 8f), CreateUniformMaterials(1), false);
+			RunSurfaceNetsPerfTest(
+				CreateSphereSdf(16f, 16f, 16f, 8f),
+				CreateUniformMaterials(1),
+				NormalsMode.GRADIENT
+			);
 		}
 
 		[Test]
 		[Performance]
-		public void SurfaceNets_Sphere_RecalcNormals_On()
+		public void SurfaceNets_Sphere_TriangleNormals()
 		{
-			RunSurfaceNetsPerfTest(CreateSphereSdf(16f, 16f, 16f, 8f), CreateUniformMaterials(1), true);
+			RunSurfaceNetsPerfTest(
+				CreateSphereSdf(16f, 16f, 16f, 8f),
+				CreateUniformMaterials(1),
+				NormalsMode.TRIANGLE_GEOMETRY
+			);
 		}
 
 		[Test]
 		[Performance]
-		public void SurfaceNets_Plane_RecalcNormals_Off()
+		public void SurfaceNets_Plane_GradientNormals()
 		{
-			RunSurfaceNetsPerfTest(CreatePlaneSdf(0f, 1f, 0f, 0f), CreateUniformMaterials(1), false);
+			RunSurfaceNetsPerfTest(
+				CreatePlaneSdf(0f, 1f, 0f, 0f),
+				CreateUniformMaterials(1),
+				NormalsMode.GRADIENT
+			);
 		}
 
 		[Test]
 		[Performance]
-		public void SurfaceNets_Plane_RecalcNormals_On()
+		public void SurfaceNets_Plane_TriangleNormals()
 		{
-			RunSurfaceNetsPerfTest(CreatePlaneSdf(0f, 1f, 0f, 0f), CreateUniformMaterials(1), true);
+			RunSurfaceNetsPerfTest(
+				CreatePlaneSdf(0f, 1f, 0f, 0f),
+				CreateUniformMaterials(1),
+				NormalsMode.TRIANGLE_GEOMETRY
+			);
 		}
 
 		void RunSurfaceNetsPerfTest(
 			NativeArray<sbyte> volume,
 			NativeArray<byte> materials,
-			bool recalcNormals
+			NormalsMode normalsMode
 		)
 		{
 			var buffer = new NativeArray<int>(
@@ -86,7 +102,7 @@ namespace Voxels.Tests.Editor
 							indices = indices,
 							vertices = vertices,
 							bounds = bounds,
-							recalculateNormals = recalcNormals,
+							normalsMode = normalsMode,
 							voxelSize = 1.0f,
 						};
 

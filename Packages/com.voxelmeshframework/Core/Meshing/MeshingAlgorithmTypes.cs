@@ -51,6 +51,27 @@ namespace Voxels.Core.Meshing
 	}
 
 	/// <summary>
+	///   Controls how vertex normals are populated during meshing.
+	/// </summary>
+	public enum NormalsMode : byte
+	{
+		/// <summary>
+		///   Do not compute normals in the base meshing job. Useful when a later pass will recompute normals.
+		/// </summary>
+		NONE = 0,
+
+		/// <summary>
+		///   Compute normals from the voxel field gradient during vertex generation (fast, approximate).
+		/// </summary>
+		GRADIENT = 1,
+
+		/// <summary>
+		///   Compute normals from triangle geometry after indices are produced (higher quality, slower).
+		/// </summary>
+		TRIANGLE_GEOMETRY = 2,
+	}
+
+	/// <summary>
 	///   Interface for scheduling meshing algorithms.
 	///   Allows different algorithms to be swapped at runtime.
 	/// </summary>
@@ -97,9 +118,9 @@ namespace Voxels.Core.Meshing
 		public int chunkSize;
 
 		/// <summary>
-		///   Whether to recalculate normals from triangle geometry.
+		///   Normal computation strategy for the base meshing job.
 		/// </summary>
-		public bool recalculateNormals;
+		public NormalsMode normalsMode;
 
 		/// <summary>
 		///   How to distribute materials to vertices.

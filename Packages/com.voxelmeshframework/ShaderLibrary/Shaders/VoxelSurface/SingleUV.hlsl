@@ -17,31 +17,17 @@ struct TriplanarUV {
 TriplanarUV get_triplanar_uv(in float3 localPos, in float3 localNormal) {
   TriplanarUV triUV;
   float3 p = localPos * _UVScale;
-  
+
   // Calculate UV coordinates for each axis projection
-  triUV.x = p.zy; // X-axis uses YZ plane
-  triUV.y = p.xz; // Y-axis uses XZ plane  
-  triUV.z = p.xy; // Z-axis uses XY plane
-  
-  // Handle negative normals to prevent mirroring artifacts
-  if (localNormal.x < 0) {
-    triUV.x.x = -triUV.x.x;
-  }
-  if (localNormal.y < 0) {
-    triUV.y.x = -triUV.y.x;
-  }
-  if (localNormal.z >= 0) {
-    triUV.z.x = -triUV.z.x;
-  }
-  
-  // Add offsets to prevent seams
-  triUV.x.y += 0.5;
-  triUV.z.x += 0.5;
-  
+  triUV.x = p.yz; // X-axis uses YZ plane (match Triplanar.hlsl)
+  triUV.y = p.zx; // Y-axis uses ZX plane (match Triplanar.hlsl)
+  triUV.z = p.xy; // Z-axis uses XY plane (match Triplanar.hlsl)
+
   return triUV;
 }
 
-half3 get_triplanar_weights(in float3 localNormal, in half heightX, in half heightY, in half heightZ) {
+half3 get_triplanar_weights(in float3 localNormal, in half heightX,
+                            in half heightY, in half heightZ) {
   half3 triW = abs(localNormal);
   triW = saturate(triW - _BlendOffset);
   // Height-based blending will be implemented in next step
@@ -55,12 +41,24 @@ half3 get_triplanar_weights_simple(in float3 localNormal) {
   return triW / (triW.x + triW.y + triW.z);
 }
 
-struct TriplanarTextureArraySampler {
+// Object-space interleaved gradient noise for stable dithering
+inline float interleaved_gradient_noise(in float2 p) {
+  return frac(52.9829189 * frac(dot(p, float2(0.06711056, 0.00583715))));
+}
+
+inline uint select_axis_from_weights(in half3 w, in float threshold) {
+  half xy = w.x + w.y;
+  return (threshold < w.x) ? 0u : ((threshold < xy) ? 1u : 2u);
+}
+
+struct SingleUVTextureArraySampler {
   TriplanarUV triUV;
   half3 triWeights;
   half2 uvDxX, uvDyX;
   half2 uvDxY, uvDyY;
   half2 uvDxZ, uvDyZ;
+  half2 uv;
+  half2 uvDx, uvDy;
 
   half4 sample(in int chan, TEXTURE2D_ARRAY(t2d), SAMPLER(smp)) {
     return SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uv, chan, uvDx, uvDy);
@@ -97,81 +95,85 @@ struct TriplanarTextureArraySampler {
     half3 wx = blend_triplanar_normal(nx, worldNormal.zyx).zyx;
     half3 wy = blend_triplanar_normal(ny, worldNormal.xzy).xzy;
     half3 wz = blend_triplanar_normal(nz, worldNormal);
-    normal = normalize(wx * blend.x + wy * blend.y + wz * blend.z);
+    normal =
+        normalize(wx * triWeights.x + wy * triWeights.y + wz * triWeights.z);
 
     smoothness = saturate(s.b);
     ao = saturate(s.a);
   }
 
   void gather(in float3 localNormal, in float3 localPos) {
-    // Calculate triplanar blend weights
-    blend = normalize(pow(abs(localNormal), _BlendContrast / 8.0));
-    blend /= dot(blend, 1.0f);
+    triWeights = get_triplanar_weights_simple(localNormal);
+    triUV = get_triplanar_uv(localPos, localNormal);
 
-    // Calculate individual triplanar UVs with correct coordinate assignments
-    half2 uvx = localPos.zy * _UVScale; // X-axis uses YZ plane
-    half2 uvy = localPos.xz * _UVScale; // Y-axis uses XZ plane
-    half2 uvz = localPos.xy * _UVScale; // Z-axis uses XY plane
+    uv = triUV.x * triWeights.x + triUV.y * triWeights.y +
+         triUV.z * triWeights.z;
 
-    // Handle negative normals to prevent mirroring artifacts
-    if (localNormal.x < 0) {
-      uvx.x = -uvx.x;
-    }
-    if (localNormal.y < 0) {
-      uvy.x = -uvy.x;
-    }
-    if (localNormal.z >= 0) {
-      uvz.x = -uvz.x;
-    }
+    half2 uvxDx = ddx(triUV.x);
+    half2 uvyDx = ddx(triUV.y);
+    half2 uvzDx = ddx(triUV.z);
 
-    // Add offsets to prevent seams
-    uvx.y += 0.5;
-    uvz.x += 0.5;
+    half2 uvxDy = ddy(triUV.x);
+    half2 uvyDy = ddy(triUV.y);
+    half2 uvzDy = ddy(triUV.z);
 
-    // Lerp UVs based on blend weights to create single UV
-    uv = uvx * blend.x + uvy * blend.y + uvz * blend.z;
-
-    // Calculate derivatives for the lerped UV
-    half2 uvxDx = ddx(uvx);
-    half2 uvyDx = ddx(uvy);
-    half2 uvzDx = ddx(uvz);
-
-    half2 uvxDy = ddy(uvx);
-    half2 uvyDy = ddy(uvy);
-    half2 uvzDy = ddy(uvz);
-
-    uvDx = uvxDx * blend.x + uvyDx * blend.y + uvzDx * blend.z;
-    uvDy = uvxDy * blend.x + uvyDy * blend.y + uvzDy * blend.z;
+    uvDx = uvxDx * triWeights.x + uvyDx * triWeights.y + uvzDx * triWeights.z;
+    uvDy = uvxDy * triWeights.x + uvyDy * triWeights.y + uvzDy * triWeights.z;
   }
 
   void gatherLOD(in float3 localNormal, in float3 localPos) {
-    // Calculate triplanar blend weights
-    blend = normalize(pow(abs(localNormal), _BlendContrast / 8.0));
-    blend /= dot(blend, 1.0f);
-
-    // Calculate individual triplanar UVs with correct coordinate assignments
-    half2 uvx = localPos.zy * _UVScale; // X-axis uses YZ plane
-    half2 uvy = localPos.xz * _UVScale; // Y-axis uses XZ plane
-    half2 uvz = localPos.xy * _UVScale; // Z-axis uses XY plane
-
-    // Handle negative normals to prevent mirroring artifacts
-    if (localNormal.x < 0) {
-      uvx.x = -uvx.x;
-    }
-    if (localNormal.y < 0) {
-      uvy.x = -uvy.x;
-    }
-    if (localNormal.z >= 0) {
-      uvz.x = -uvz.x;
-    }
-
-    // Add offsets to prevent seams
-    uvx.y += 0.5;
-    uvz.x += 0.5;
-
-    // Lerp UVs based on blend weights to create single UV
-    uv = uvx * blend.x + uvy * blend.y + uvz * blend.z;
+    triWeights = get_triplanar_weights_simple(localNormal);
+    triUV = get_triplanar_uv(localPos, localNormal);
+    uv = triUV.x * triWeights.x + triUV.y * triWeights.y +
+         triUV.z * triWeights.z;
   }
 
   void offset(in float2 offset) { uv += offset; }
+
+  // Dithered single-axis selection to reduce cross-fade blur with one sample
+  void gatherDithered(in float3 localNormal, in float3 localPos) {
+    triWeights = get_triplanar_weights_simple(localNormal);
+    triUV = get_triplanar_uv(localPos, localNormal);
+
+    float t = interleaved_gradient_noise(localPos.xy);
+    uint axis = select_axis_from_weights(triWeights, t);
+
+    // Derivatives for each axis
+    half2 ddxX = ddx(triUV.x);
+    half2 ddyX = ddy(triUV.x);
+    half2 ddxY = ddx(triUV.y);
+    half2 ddyY = ddy(triUV.y);
+    half2 ddxZ = ddx(triUV.z);
+    half2 ddyZ = ddy(triUV.z);
+
+    if (axis == 0u) {
+      uv = triUV.x;
+      uvDx = ddxX;
+      uvDy = ddyX;
+    } else if (axis == 1u) {
+      uv = triUV.y;
+      uvDx = ddxY;
+      uvDy = ddyY;
+    } else {
+      uv = triUV.z;
+      uvDx = ddxZ;
+      uvDy = ddyZ;
+    }
+  }
+
+  void gatherLODDithered(in float3 localNormal, in float3 localPos) {
+    triWeights = get_triplanar_weights_simple(localNormal);
+    triUV = get_triplanar_uv(localPos, localNormal);
+
+    float t = interleaved_gradient_noise(localPos.xy);
+    uint axis = select_axis_from_weights(triWeights, t);
+
+    if (axis == 0u) {
+      uv = triUV.x;
+    } else if (axis == 1u) {
+      uv = triUV.y;
+    } else {
+      uv = triUV.z;
+    }
+  }
 };

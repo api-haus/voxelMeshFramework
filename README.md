@@ -34,7 +34,6 @@ The Project is released under MIT License.
 * Stylized textures obtained from https://freestylized.com
 	* Released under a Royalty Free License
 * Gradient Skybox https://github.com/aadebdeb/GradientSkybox [MIT]
-* Bloom Shader for Built-In Render Pipeline https://github.com/mightypanda/Unity-Fast-Bloom [MIT]
 
 ### Used Internally
 

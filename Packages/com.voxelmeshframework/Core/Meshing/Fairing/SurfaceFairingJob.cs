@@ -45,11 +45,18 @@ namespace Voxels.Core.Meshing.Fairing
 		public NativeList<int> neighborIndices;
 
 		/// <summary>
-		/// Material IDs for each vertex (from vertex.color.r).
+		/// Material IDs for each vertex (legacy). Not used for blending, kept for compatibility.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeList<byte> materialId;
+
+		/// <summary>
+		/// Blended material weights per vertex (RGBA -> up to 4 weights). Used for boundary detection.
+		/// </summary>
+		[NoAlias]
+		[ReadOnly]
+		public NativeList<float4> materialWeights;
 
 		/// <summary>
 		/// Cell coordinates for each vertex (for constraint enforcement).
@@ -107,9 +114,9 @@ namespace Voxels.Core.Meshing.Fairing
 				var neighborRange = neighborIndexRanges[vertexIndex];
 				var neighborAverage = CalculateNeighborAverage(vertexIndex, neighborRange, currentPos);
 
-				// ===== ADAPTIVE STEP SIZE =====
-				// Reduce step size near material boundaries to preserve sharp features.
-				var adaptiveStep = GetAdaptiveStepSize(currentMaterial, neighborRange);
+				// ===== ADAPTIVE STEP SIZE (WEIGHT DIVERGENCE) =====
+				// Reduce step size near transitions detected via material weight divergence.
+				var adaptiveStep = GetAdaptiveStepSize(vertexIndex, neighborRange);
 
 				// ===== FAIRING STEP =====
 				// Move toward neighbor average: p' = p + α * (avg - p)
@@ -147,27 +154,47 @@ namespace Voxels.Core.Meshing.Fairing
 		/// <summary>
 		/// Determines adaptive step size based on material boundary detection.
 		/// </summary>
-		float GetAdaptiveStepSize(byte currentMaterial, int2 neighborRange)
+		float GetAdaptiveStepSize(int vertexIndex, int2 neighborRange)
 		{
 			var baseStep = fairingStepSize;
-
-			// ===== MATERIAL BOUNDARY DETECTION =====
-			// Check if any face neighbor has different material.
+			var wi = materialWeights[vertexIndex];
+			var dMax = 0.0f;
 			for (var i = 0; i < neighborRange.y; i++)
 			{
 				var neighborIndex = neighborIndices[neighborRange.x + i];
-				var neighborMaterial = materialId[neighborIndex];
-
-				if (neighborMaterial != currentMaterial)
-				{
-					// ===== BOUNDARY STEP REDUCTION =====
-					// Significantly reduce step size at material boundaries
-					// to preserve sharp material transitions per the paper.
-					return baseStep * 0.3f;
-				}
+				var wj = materialWeights[neighborIndex];
+				// L1 distance across weights (sum of absolute differences)
+				var d = abs(wi.x - wj.x) + abs(wi.y - wj.y) + abs(wi.z - wj.z) + abs(wi.w - wj.w);
+				dMax = max(dMax, d);
 			}
 
-			return baseStep;
+			// Map divergence to attenuation beta in [0,1]
+			const float t0 = 0.15f; // start attenuating
+			const float t1 = 0.35f; // full attenuation region
+			var betaDiv = 1.0f - saturate((dMax - t0) / (t1 - t0));
+
+			// Optional confidence term: maxMinusSecondMax(w)
+			var s0 = max(wi.x, max(wi.y, max(wi.z, wi.w)));
+			var s1 = min(
+				max(wi.x, max(wi.y, wi.z)),
+				max(min(wi.x, wi.y), max(min(wi.x, wi.z), min(wi.y, wi.z)))
+			); // fast second-max approx not trivial; do explicit
+			// Compute exact second max explicitly
+			var a = wi.x;
+			var b = wi.y;
+			var c = wi.z;
+			var d2 = wi.w;
+			var m1 = max(a, max(b, max(c, d2)));
+			var m2 = max(
+				min(a, b),
+				max(min(a, c), max(min(a, d2), max(min(b, c), max(min(b, d2), min(c, d2)))))
+			);
+			var conf = max(0.0f, m1 - m2);
+			const float cRef = 0.4f;
+			var betaConf = saturate(conf / cRef);
+
+			var beta = min(betaDiv, betaConf);
+			return baseStep * beta;
 		}
 
 		/// <summary>

@@ -62,7 +62,7 @@ namespace Voxels.Tests.Editor
 				indices = indices,
 				vertices = vertices,
 				bounds = bounds,
-				recalculateNormals = false,
+				normalsMode = NormalsMode.NONE,
 				voxelSize = 1.0f,
 			};
 
@@ -124,7 +124,7 @@ namespace Voxels.Tests.Editor
 				indices = indices,
 				vertices = vertices,
 				bounds = bounds,
-				recalculateNormals = true,
+				normalsMode = NormalsMode.TRIANGLE_GEOMETRY,
 				voxelSize = 1.0f,
 			};
 
@@ -199,7 +199,7 @@ namespace Voxels.Tests.Editor
 				indices = indices1,
 				vertices = vertices1,
 				bounds = bounds1,
-				recalculateNormals = false,
+				normalsMode = NormalsMode.NONE,
 				voxelSize = 1.0f,
 			};
 			job1.Schedule().Complete();
@@ -218,7 +218,7 @@ namespace Voxels.Tests.Editor
 				indices = indices2,
 				vertices = vertices2,
 				bounds = bounds2,
-				recalculateNormals = false,
+				normalsMode = NormalsMode.NONE,
 				voxelSize = 2.0f,
 			};
 			job2.Schedule().Complete();

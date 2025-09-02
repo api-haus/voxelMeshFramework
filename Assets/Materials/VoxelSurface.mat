@@ -146,6 +146,7 @@ Material:
     - _Blend: 0
     - _BlendContrast: 8
     - _BlendModePreserveSpecular: 1
+    - _BlendOffset: 0
     - _BumpScale: 1
     - _CastShadows: 1
     - _Channel: 0

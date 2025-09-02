@@ -63,7 +63,10 @@ namespace Voxels.Core.Meshing.Systems
 					edgeTable = SharedStaticMeshingResources.EdgeTable,
 					voxelSize = nvm.volume.voxelSize,
 					chunkSize = VoxelConstants.CHUNK_SIZE,
-					recalculateNormals = true,
+					normalsMode =
+						algorithm.enableFairing && algorithm.recomputeNormalsAfterFairing
+							? NormalsMode.NONE
+							: NormalsMode.TRIANGLE_GEOMETRY,
 					materialDistributionMode = algorithm.materialDistributionMode,
 				};
 
@@ -77,21 +80,35 @@ namespace Voxels.Core.Meshing.Systems
 
 				// Schedule appropriate algorithm
 				var pre = VoxelJobFenceRegistry.Get(entity);
-				var meshingJob = algorithm.algorithm switch
+				JobHandle meshingJob;
+				switch (algorithm.algorithm)
 				{
-					VoxelMeshingAlgorithm.NAIVE_SURFACE_NETS => ScheduleNaiveSurfaceNetsWithOptionalFairing(
-						algorithm,
-						input,
-						output,
-						nvm.meshing.fairing,
-						pre
-					),
-					VoxelMeshingAlgorithm.DUAL_CONTOURING => pre,
-					VoxelMeshingAlgorithm.MARCHING_CUBES => pre,
-					_ => throw new NotImplementedException(
-						$"Algorithm {algorithm.algorithm} not implemented"
-					),
-				};
+					case VoxelMeshingAlgorithm.NAIVE_SURFACE_NETS:
+						if (algorithm.enableFairing)
+						{
+							meshingJob = new NaiveSurfaceNetsFairingScheduler
+							{
+								fairingBuffers = nvm.meshing.fairing,
+								fairingIterations = algorithm.fairingIterations,
+								fairingStepSize = algorithm.fairingStepSize,
+								cellMargin = algorithm.cellMargin,
+								recomputeNormalsAfterFairing = algorithm.recomputeNormalsAfterFairing,
+							}.Schedule(input, output, pre);
+						}
+						else
+						{
+							meshingJob = new NaiveSurfaceNetsScheduler().Schedule(input, output, pre);
+						}
+						break;
+					case VoxelMeshingAlgorithm.DUAL_CONTOURING:
+						meshingJob = pre;
+						break;
+					case VoxelMeshingAlgorithm.MARCHING_CUBES:
+						meshingJob = pre;
+						break;
+					default:
+						throw new NotImplementedException($"Algorithm {algorithm.algorithm} not implemented");
+				}
 
 				// Schedule mesh upload job
 				meshingJob = new UploadMeshJob
@@ -142,6 +159,7 @@ namespace Voxels.Core.Meshing.Systems
 				vertices = output.vertices,
 				outPositions = fairingBuffers.positionsA,
 				outMaterialIds = fairingBuffers.materialIds,
+				outMaterialWeights = fairingBuffers.materialWeights,
 			}.Schedule(meshingJob);
 
 			var job2 = new DeriveCellCoordsJob
@@ -185,6 +203,7 @@ namespace Voxels.Core.Meshing.Systems
 					neighborIndexRanges = fairingBuffers.neighborIndexRanges,
 					neighborIndices = fairingBuffers.neighborIndices,
 					materialId = fairingBuffers.materialIds,
+					materialWeights = fairingBuffers.materialWeights,
 					cellCoords = fairingBuffers.cellCoords,
 					outPositions = outBuffer,
 					voxelSize = input.voxelSize,
@@ -207,30 +226,11 @@ namespace Voxels.Core.Meshing.Systems
 			var finalJob = updateVerticesJob;
 			if (algorithm.recomputeNormalsAfterFairing)
 			{
-				var clearNormalsJob = new ClearNormalsJob
-				{
-					vertices = output.vertices,
-					normals = fairingBuffers.normals,
-				}.Schedule(finalJob);
-
-				var recalcNormalsJob = new RecalculateNormalsJob
+				finalJob = new RecalculateNormalsJob
 				{
 					indices = output.indices.AsDeferredJobArray(),
 					vertices = output.vertices,
-					normals = fairingBuffers.normals,
-				}.Schedule(clearNormalsJob);
-
-				var normalizeJob = new NormalizeNormalsJob
-				{
-					vertices = output.vertices,
-					normals = fairingBuffers.normals,
-				}.Schedule(recalcNormalsJob);
-
-				finalJob = new UpdateVertexNormalsJob
-				{
-					vertices = output.vertices,
-					newNormals = fairingBuffers.normals,
-				}.Schedule(normalizeJob);
+				}.Schedule(finalJob);
 			}
 
 			return finalJob;
