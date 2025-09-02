@@ -97,7 +97,7 @@
     },
     "com.unity.ext.nunit": {
       "version": "2.0.5",
-      "depth": 2,
+      "depth": 1,
       "source": "builtin",
       "dependencies": {}
     },
@@ -294,7 +294,7 @@
     },
     "com.unity.test-framework": {
       "version": "1.5.1",
-      "depth": 1,
+      "depth": 0,
       "source": "builtin",
       "dependencies": {
         "com.unity.ext.nunit": "2.0.3",
@@ -304,7 +304,7 @@
     },
     "com.unity.test-framework.performance": {
       "version": "3.1.0",
-      "depth": 1,
+      "depth": 0,
       "source": "registry",
       "dependencies": {
         "com.unity.test-framework": "1.1.33",
