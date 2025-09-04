@@ -11,7 +11,7 @@ namespace Voxels.Core.Stamps
 	using static VoxelConstants;
 
 	//sphere only
-	[BurstCompile]
+	[BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
 	struct ApplyVoxelStampJob : IJob
 	{
 		[NativeDisableContainerSafetyRestriction]
@@ -57,7 +57,7 @@ namespace Voxels.Core.Stamps
 			var scale = length(volumeWtl.c0.xyz); // Assuming uniform scale
 			var radiusVoxel = stamp.shape.sphere.radius * scale * rcp(voxelSize);
 			var r2 = radiusVoxel * radiusVoxel;
-			var invRadius = 1f / radiusVoxel;
+			var rcpRadius = rcp(radiusVoxel);
 
 			for (var x = vMin.x; x <= vMax.x; x++)
 			for (var y = vMin.y; y <= vMax.y; y++)
@@ -74,7 +74,7 @@ namespace Voxels.Core.Stamps
 				// X_SHIFT and Y_SHIFT are bit shifts corresponding to chunk dimensions.
 				var ptr = (x << X_SHIFT) + (y << Y_SHIFT) + z;
 
-				var weight = saturate(1f - (sqrt(d2) * invRadius));
+				var weight = saturate(1f - (sqrt(d2) * rcpRadius));
 
 				volumeSdf[ptr] = (sbyte)clamp(
 					//
@@ -83,13 +83,17 @@ namespace Voxels.Core.Stamps
 						lerp(
 							volumeSdf[ptr],
 							select(-127, 127, stamp.strength >= 0),
-							weight * abs(stamp.strength)
+							weight * abs(stamp.strength) * rcp(127f)
 						)
 					),
 					-127,
 					127
 				);
-				volumeMaterials[ptr] = (byte)select((int)MATERIAL_AIR, stamp.material, volumeSdf[ptr] >= 0);
+				volumeMaterials[ptr] = (byte)select(
+					MATERIAL_AIR,
+					select(volumeMaterials[ptr], (int)stamp.material, stamp.strength >= 0),
+					volumeSdf[ptr] >= 0
+				);
 			}
 		}
 	}

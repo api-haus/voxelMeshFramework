@@ -9,15 +9,17 @@ namespace Voxels.Core.Procedural
 	using UnityEngine.Serialization;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Mathematics.math;
+	using static Unity.Mathematics.noise;
 	using static VoxelConstants;
 
 	public sealed class SimpleNoiseVoxelGenerator : ProceduralVoxelGeneratorBehaviour
 	{
-		[SerializeField, FormerlySerializedAs("scale")]
+		[SerializeField]
+		[FormerlySerializedAs("scale")]
 		float noiseFrequency = 0.1f;
 
 		[SerializeField]
-		float groundPlaneY = 0f;
+		float groundPlaneY;
 
 		[SerializeField]
 		float groundAmplitude = 10f;
@@ -38,17 +40,20 @@ namespace Voxels.Core.Procedural
 		float grassUpDotThreshold = 0.7f;
 
 		public override JobHandle Schedule(
-			MinMaxAABB bounds,
+			MinMaxAABB localBounds,
+			float4x4 ltw,
 			float voxelSize,
 			VoxelVolumeData data,
 			JobHandle inputDeps
 		)
 		{
 			using var _ = SimpleNoiseVoxelGenerator_Schedule.Auto();
+
 			// 1) Generate SDF
 			inputDeps = new SdfJob
 			{
-				bounds = bounds,
+				ltw = ltw,
+				bounds = localBounds,
 				voxelSize = voxelSize,
 				volumeData = data,
 				noiseFrequency = noiseFrequency,
@@ -60,7 +65,8 @@ namespace Voxels.Core.Procedural
 			// 2) Paint materials based on SDF and heightfield gradient
 			inputDeps = new MaterialPaintJob
 			{
-				bounds = bounds,
+				ltw = ltw,
+				bounds = localBounds,
 				voxelSize = voxelSize,
 				volumeData = data,
 				noiseFrequency = noiseFrequency,
@@ -76,12 +82,13 @@ namespace Voxels.Core.Procedural
 			return inputDeps;
 		}
 
-		[BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
+		[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
 		struct SdfJob : IJobFor
 		{
 			public float voxelSize;
 			public MinMaxAABB bounds;
 			public VoxelVolumeData volumeData;
+			public float4x4 ltw;
 
 			public float noiseFrequency;
 			public float groundPlaneY;
@@ -99,14 +106,17 @@ namespace Voxels.Core.Procedural
 
 				var coord = bounds.Min + (localCoord * voxelSize);
 
+				coord = transform(ltw, coord);
+
 				// Heightfield terrain: height = groundPlaneY + noise2D(xz) * groundAmplitude
 				var seed2 = new float2(seed, seed);
-				var heightNoise = noise.cnoise(coord.xz * noiseFrequency + seed2);
-				var surfaceHeight = groundPlaneY + heightNoise * groundAmplitude;
+				var heightNoise = snoise((coord.xz * noiseFrequency) + seed2);
+				var surfaceHeight = groundPlaneY + (heightNoise * groundAmplitude);
 
 				// Signed distance in world units (positive below/inside the surface)
 				var sdfWorld = surfaceHeight - coord.y;
 				var sdfByte = clamp(sdfWorld, -127f, 127f);
+
 				volumeData.sdfVolume[index] = (sbyte)sdfByte;
 			}
 		}
@@ -117,6 +127,7 @@ namespace Voxels.Core.Procedural
 			public float voxelSize;
 			public MinMaxAABB bounds;
 			public VoxelVolumeData volumeData;
+			public float4x4 ltw;
 
 			public float noiseFrequency;
 			public float groundPlaneY;
@@ -137,6 +148,7 @@ namespace Voxels.Core.Procedural
 				float3 localCoord = int3(x, y, z);
 				var coord = bounds.Min + (localCoord * voxelSize);
 
+				coord = transform(ltw, coord);
 				var s = (float)volumeData.sdfVolume[index];
 
 				// Approximate normal from heightfield derivatives for up/grass detection
@@ -144,16 +156,16 @@ namespace Voxels.Core.Procedural
 				var eps = voxelSize;
 				var hpx =
 					groundPlaneY
-					+ noise.cnoise((coord.xz + float2(eps, 0)) * noiseFrequency + seed2) * groundAmplitude;
+					+ (snoise(((coord.xz + float2(eps, 0)) * noiseFrequency) + seed2) * groundAmplitude);
 				var hmx =
 					groundPlaneY
-					+ noise.cnoise((coord.xz + float2(-eps, 0)) * noiseFrequency + seed2) * groundAmplitude;
+					+ (snoise(((coord.xz + float2(-eps, 0)) * noiseFrequency) + seed2) * groundAmplitude);
 				var hpz =
 					groundPlaneY
-					+ noise.cnoise((coord.xz + float2(0, eps)) * noiseFrequency + seed2) * groundAmplitude;
+					+ (snoise(((coord.xz + float2(0, eps)) * noiseFrequency) + seed2) * groundAmplitude);
 				var hmz =
 					groundPlaneY
-					+ noise.cnoise((coord.xz + float2(0, -eps)) * noiseFrequency + seed2) * groundAmplitude;
+					+ (snoise(((coord.xz + float2(0, -eps)) * noiseFrequency) + seed2) * groundAmplitude);
 				var dhdx = (hpx - hmx) / (2f * eps);
 				var dhdz = (hpz - hmz) / (2f * eps);
 				var grad = normalize(float3(-dhdx, 1f, -dhdz));
@@ -163,22 +175,23 @@ namespace Voxels.Core.Procedural
 				{
 					if (abs(s) <= voxelSize)
 					{
-						byte padMat = grad.y > grassUpDotThreshold ? materialGrass : materialGround;
+						var padMat = grad.y > grassUpDotThreshold ? materialGrass : materialGround;
 						volumeData.materials[index] = padMat;
 					}
 					else
 					{
 						volumeData.materials[index] = MATERIAL_AIR;
 					}
+
 					return;
 				}
 
 				// Inside: choose gold vs ground by secondary 2D noise
-				var n2 = noise.cnoise(coord.xz * noiseFrequency * 2f + (seed2 + 100f));
+				var n2 = snoise((coord.xz * noiseFrequency * 2f) + (seed2 + 100f));
 				var insideMat = n2 > 0.2f ? materialGold : materialGround;
 
 				// Near-surface: check sign change in 6-neighborhood using SDF volume
-				bool nearAir = false;
+				var nearAir = false;
 				// X+1
 				if (!nearAir && x < CHUNK_SIZE_MINUS_ONE)
 				{
@@ -186,6 +199,7 @@ namespace Voxels.Core.Procedural
 					if (neighbor < 0f)
 						nearAir = true;
 				}
+
 				// X-1
 				if (!nearAir && x > 0)
 				{
@@ -193,6 +207,7 @@ namespace Voxels.Core.Procedural
 					if (neighbor < 0f)
 						nearAir = true;
 				}
+
 				// Y+1
 				if (!nearAir && y < CHUNK_SIZE_MINUS_ONE)
 				{
@@ -200,6 +215,7 @@ namespace Voxels.Core.Procedural
 					if (neighbor < 0f)
 						nearAir = true;
 				}
+
 				// Y-1
 				if (!nearAir && y > 0)
 				{
@@ -207,6 +223,7 @@ namespace Voxels.Core.Procedural
 					if (neighbor < 0f)
 						nearAir = true;
 				}
+
 				// Z+1
 				if (!nearAir && z < CHUNK_SIZE_MINUS_ONE)
 				{
@@ -214,6 +231,7 @@ namespace Voxels.Core.Procedural
 					if (neighbor < 0f)
 						nearAir = true;
 				}
+
 				// Z-1
 				if (!nearAir && z > 0)
 				{
@@ -222,7 +240,7 @@ namespace Voxels.Core.Procedural
 						nearAir = true;
 				}
 
-				byte mat = insideMat;
+				var mat = insideMat;
 				if (nearAir)
 				{
 					// Up-facing surfaces become grass

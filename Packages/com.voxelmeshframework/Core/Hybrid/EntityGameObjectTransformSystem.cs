@@ -3,7 +3,6 @@ namespace Voxels.Core.Hybrid
 	using Unity.Entities;
 	using Unity.Transforms;
 	using static Diagnostics.VoxelProfiler.Marks;
-	using static Unity.Mathematics.math;
 
 	[RequireMatchingQueriesForUpdate]
 	[UpdateBefore(typeof(TransformSystemGroup))]
@@ -12,21 +11,24 @@ namespace Voxels.Core.Hybrid
 		protected override void OnUpdate()
 		{
 			using var _ = EntityGameObjectTransformSystem_Update.Auto();
-			using (EntityGameObjectTransformSystem_UpdateLTW.Auto())
-			{
-				foreach (
-					var (ltwRef, trs) in SystemAPI.Query<
-						RefRW<LocalTransform>,
-						// ReSharper disable once Unity.Entities.MustBeSurroundedWithRefRwRo
-						EntityGameObjectTransformAttachment
-					>()
-				)
-				{
-					ltwRef.ValueRW.Position = trs.attachTo.position;
-					ltwRef.ValueRW.Rotation = trs.attachTo.rotation;
-					ltwRef.ValueRW.Scale = cmax(trs.attachTo.localScale);
-				}
-			}
+
+			// using (EntityGameObjectTransformSystem_UpdateLocalTransform.Auto())
+			// {
+			// 	foreach (
+			// 		var (ltwRef, trs) in SystemAPI.Query<
+			// 			RefRW<LocalTransform>,
+			// 			// ReSharper disable once Unity.Entities.MustBeSurroundedWithRefRwRo
+			// 			EntityGameObjectTransformAttachment
+			// 		>()
+			// 	)
+			// 	{
+			// 		if (!trs.attachTo)
+			// 			continue;
+			// 		ltwRef.ValueRW.Position = trs.attachTo.position;
+			// 		ltwRef.ValueRW.Rotation = trs.attachTo.rotation;
+			// 		ltwRef.ValueRW.Scale = cmax(trs.attachTo.localScale);
+			// 	}
+			// }
 
 			using (EntityGameObjectTransformSystem_UpdateLocalToWorld.Auto())
 			{
@@ -37,7 +39,11 @@ namespace Voxels.Core.Hybrid
 						EntityGameObjectTransformAttachment
 					>()
 				)
+				{
+					if (null == trs || !trs.attachTo)
+						continue;
 					ltwRef.ValueRW.Value = trs.attachTo.localToWorldMatrix;
+				}
 			}
 		}
 	}

@@ -1,5 +1,6 @@
 namespace Voxels.Core.Authoring
 {
+	using Meshing;
 	using Procedural;
 	using Unity.Mathematics;
 	using UnityEngine;
@@ -16,6 +17,9 @@ namespace Voxels.Core.Authoring
 		internal Material surfaceMaterial;
 
 		[SerializeField]
+		internal GameObject chunkPrefab;
+
+		[SerializeField]
 		[Min(0.1f)]
 		internal float voxelSize = 1f;
 
@@ -24,6 +28,34 @@ namespace Voxels.Core.Authoring
 
 		[SerializeField]
 		internal ProceduralVoxelGeneratorBehaviour procedural;
+
+		[Header("Meshing Algorithm")]
+		[SerializeField]
+		internal VoxelMeshingAlgorithm meshingAlgorithm = VoxelMeshingAlgorithm.NAIVE_SURFACE_NETS;
+
+		[Header("Surface Fairing Settings")]
+		[SerializeField]
+		internal bool enableFairing;
+
+		[SerializeField]
+		[Range(0, 10)]
+		internal int fairingIterations = 5;
+
+		[SerializeField]
+		[Range(0.3f, 0.8f)]
+		internal float fairingStepSize = 0.6f;
+
+		[SerializeField]
+		[Range(0.05f, 0.2f)]
+		internal float cellMargin = 0.1f;
+
+		[SerializeField]
+		internal bool recomputeNormalsAfterFairing;
+
+		[Header("Materials")]
+		[SerializeField]
+		internal MaterialDistributionMode materialDistributionMode =
+			MaterialDistributionMode.BLENDED_CORNER_SUM;
 
 		void Awake()
 		{

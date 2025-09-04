@@ -1,15 +1,14 @@
 namespace Voxels.Core.Meshing.Systems
 {
+	using Concurrency;
 	using Hybrid;
 	using Tags;
 	using Unity.Burst;
 	using Unity.Entities;
-	using Voxels.Core.Concurrency;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 
-	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[RequireMatchingQueriesForUpdate]
 	[UpdateAfter(typeof(VoxelMeshingSystem))]
 	public partial class ManagedVoxelMeshingSystem : SystemBase
@@ -33,16 +32,16 @@ namespace Voxels.Core.Meshing.Systems
 					if (!VoxelJobFenceRegistry.TryComplete(entity))
 						continue;
 					ref var nvm = ref nativeVoxelMeshRef.ValueRW;
+					// Skip if mesh data has not been allocated by the meshing/upload pipeline
+					if (nvm.meshing.meshData.Length == 0)
+						continue;
 					nvm.ApplyMeshManaged();
 					ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(entity, false);
 				}
 
 			// attach w/ mesh filter
 			foreach (
-				var (nativeVoxelMeshRef, meshFilterAttachment, entity) in Query<
-					RefRW<NativeVoxelMesh>,
-					EntityMeshFilterAttachment
-				>()
+				var (nativeVoxelMeshRef, entity) in Query<RefRW<NativeVoxelMesh>>()
 					.WithAll<NeedsManagedMeshUpdate>()
 					.WithEntityAccess()
 			)
@@ -50,6 +49,15 @@ namespace Voxels.Core.Meshing.Systems
 				{
 					if (!VoxelJobFenceRegistry.TryComplete(entity))
 						continue;
+
+					if (!EntityManager.HasComponent<EntityMeshFilterAttachment>(entity))
+						continue;
+					var meshFilterAttachment = EntityManager.GetComponentObject<EntityMeshFilterAttachment>(
+						entity
+					);
+					if (meshFilterAttachment == null || meshFilterAttachment.attachTo == null)
+						continue;
+
 					ref var nvm = ref nativeVoxelMeshRef.ValueRW;
 					var indexCount = nvm.meshing.indices.Length;
 					var hasMesh = indexCount > 16;
@@ -58,10 +66,7 @@ namespace Voxels.Core.Meshing.Systems
 
 			// attach w/ mesh collider
 			foreach (
-				var (nativeVoxelMeshRef, meshColliderAttachment, entity) in Query<
-					RefRW<NativeVoxelMesh>,
-					EntityMeshColliderAttachment
-				>()
+				var (nativeVoxelMeshRef, entity) in Query<RefRW<NativeVoxelMesh>>()
 					.WithAll<NeedsManagedMeshUpdate>()
 					.WithEntityAccess()
 			)
@@ -69,6 +74,14 @@ namespace Voxels.Core.Meshing.Systems
 				{
 					if (!VoxelJobFenceRegistry.TryComplete(entity))
 						continue;
+
+					if (!EntityManager.HasComponent<EntityMeshColliderAttachment>(entity))
+						continue;
+					var meshColliderAttachment =
+						EntityManager.GetComponentObject<EntityMeshColliderAttachment>(entity);
+					if (meshColliderAttachment == null || meshColliderAttachment.attachTo == null)
+						continue;
+
 					ref var nvm = ref nativeVoxelMeshRef.ValueRW;
 					var indexCount = nvm.meshing.indices.Length;
 					var hasMesh = indexCount > 16;

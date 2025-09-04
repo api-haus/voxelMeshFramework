@@ -1,17 +1,15 @@
 namespace Voxels.Core.Procedural
 {
+	using Concurrency;
 	using Grids;
 	using Meshing;
 	using Meshing.Tags;
 	using Tags;
 	using Unity.Entities;
 	using Unity.Jobs;
-	using Unity.Mathematics;
 	using Unity.Transforms;
-	using Voxels.Core.Concurrency;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
-	using static Unity.Mathematics.Geometry.Math;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 
 	[RequireMatchingQueriesForUpdate]
@@ -50,7 +48,8 @@ namespace Voxels.Core.Procedural
 				using (ProceduralVoxelGenerationSystem_Schedule.Auto())
 				{
 					var job = pcg.generator.Schedule(
-						Transform((float3x3)ltw.Value, voxelObject.localBounds),
+						voxelObject.localBounds,
+						ltw.Value,
 						voxelObject.voxelSize,
 						mesh.volume,
 						VoxelJobFenceRegistry.Get(entity)

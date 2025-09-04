@@ -6,12 +6,11 @@ namespace Voxels.Core.Meshing.Fairing
 	using Unity.Jobs;
 	using Unity.Mathematics;
 	using static Unity.Mathematics.math;
-	using static Voxels.Core.VoxelConstants;
 
 	/// <summary>
-	/// Performs surface fairing smoothing on vertices while preserving material boundaries.
-	/// This job implements the A+B+I approach with precomputed neighbors, adaptive step sizing,
-	/// and cell constraint enforcement for boundary-preserving surface smoothing.
+	///   Performs surface fairing smoothing on vertices while preserving material boundaries.
+	///   This job implements the A+B+I approach with precomputed neighbors, adaptive step sizing,
+	///   and cell constraint enforcement for boundary-preserving surface smoothing.
 	/// </summary>
 	[BurstCompile(
 		Debug = false,
@@ -24,73 +23,73 @@ namespace Voxels.Core.Meshing.Fairing
 	public struct SurfaceFairingJob : IJob
 	{
 		/// <summary>
-		/// Input vertex positions from previous iteration (or initial positions).
+		///   Input vertex positions from previous iteration (or initial positions).
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeList<float3> inPositions;
 
 		/// <summary>
-		/// Precomputed neighbor index ranges for each vertex.
+		///   Precomputed neighbor index ranges for each vertex.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeList<int2> neighborIndexRanges;
 
 		/// <summary>
-		/// Flattened array of neighbor vertex indices.
+		///   Flattened array of neighbor vertex indices.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeList<int> neighborIndices;
 
 		/// <summary>
-		/// Material IDs for each vertex (legacy). Not used for blending, kept for compatibility.
+		///   Material IDs for each vertex (legacy). Not used for blending, kept for compatibility.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeList<byte> materialId;
 
 		/// <summary>
-		/// Blended material weights per vertex (RGBA -> up to 4 weights). Used for boundary detection.
+		///   Blended material weights per vertex (RGBA -> up to 4 weights). Used for boundary detection.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeList<float4> materialWeights;
 
 		/// <summary>
-		/// Cell coordinates for each vertex (for constraint enforcement).
+		///   Cell coordinates for each vertex (for constraint enforcement).
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeList<int3> cellCoords;
 
 		/// <summary>
-		/// Output smoothed vertex positions.
+		///   Output smoothed vertex positions.
 		/// </summary>
 		[NoAlias]
 		public NativeList<float3> outPositions;
 
 		/// <summary>
-		/// Size of each voxel in world units.
+		///   Size of each voxel in world units.
 		/// </summary>
 		[ReadOnly]
 		public float voxelSize;
 
 		/// <summary>
-		/// Cell margin to prevent vertices from reaching cell boundaries.
+		///   Cell margin to prevent vertices from reaching cell boundaries.
 		/// </summary>
 		[ReadOnly]
 		public float cellMargin;
 
 		/// <summary>
-		/// Base step size for fairing smoothing.
+		///   Base step size for fairing smoothing.
 		/// </summary>
 		[ReadOnly]
 		public float fairingStepSize;
 
 		/// <summary>
-		/// Input vertices to get count from.
+		///   Input vertices to get count from.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
@@ -132,7 +131,7 @@ namespace Voxels.Core.Meshing.Fairing
 		}
 
 		/// <summary>
-		/// Calculates the average position of face neighbors.
+		///   Calculates the average position of face neighbors.
 		/// </summary>
 		float3 CalculateNeighborAverage(int vertexIndex, int2 neighborRange, float3 fallbackPos)
 		{
@@ -152,7 +151,7 @@ namespace Voxels.Core.Meshing.Fairing
 		}
 
 		/// <summary>
-		/// Determines adaptive step size based on material boundary detection.
+		///   Determines adaptive step size based on material boundary detection.
 		/// </summary>
 		float GetAdaptiveStepSize(int vertexIndex, int2 neighborRange)
 		{
@@ -198,7 +197,7 @@ namespace Voxels.Core.Meshing.Fairing
 		}
 
 		/// <summary>
-		/// Applies cell constraints to keep vertices within their original cell bounds.
+		///   Applies cell constraints to keep vertices within their original cell bounds.
 		/// </summary>
 		float3 ApplyCellConstraints(float3 position, int3 cellCoord)
 		{
@@ -211,7 +210,7 @@ namespace Voxels.Core.Meshing.Fairing
 			var cellMin =
 				((float3)cellCoord * voxelSize) + new float3(scaledMargin, scaledMargin, scaledMargin);
 			var cellMax =
-				(((float3)cellCoord + new float3(1.0f, 1.0f, 1.0f)) * voxelSize)
+				((cellCoord + new float3(1.0f, 1.0f, 1.0f)) * voxelSize)
 				- new float3(scaledMargin, scaledMargin, scaledMargin);
 
 			// ===== POSITION CLAMPING =====

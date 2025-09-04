@@ -4,12 +4,12 @@ namespace Voxels.Core.Meshing.Fairing
 	using Unity.Burst;
 	using Unity.Collections;
 	using Unity.Jobs;
-	using static Voxels.Core.VoxelConstants;
+	using static VoxelConstants;
 
 	/// <summary>
-	/// Builds a dense cell-to-vertex mapping for O(1) neighbor lookups.
-	/// This job creates a dense 3D array that maps each cell to its containing vertex.
-	/// For Surface Nets, each cell contains at most one vertex.
+	///   Builds a dense cell-to-vertex mapping for O(1) neighbor lookups.
+	///   This job creates a dense 3D array that maps each cell to its containing vertex.
+	///   For Surface Nets, each cell contains at most one vertex.
 	/// </summary>
 	[BurstCompile(
 		Debug = false,
@@ -22,21 +22,21 @@ namespace Voxels.Core.Meshing.Fairing
 	public struct BuildCellToVertexMapJob : IJob
 	{
 		/// <summary>
-		/// Input linear cell indices for each vertex.
+		///   Input linear cell indices for each vertex.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeList<int> cellLinearIndex;
 
 		/// <summary>
-		/// Output dense cell-to-vertex map.
-		/// Size: CHUNK_SIZE^3, initialized to -1 (empty).
+		///   Output dense cell-to-vertex map.
+		///   Size: CHUNK_SIZE^3, initialized to -1 (empty).
 		/// </summary>
 		[NoAlias]
 		public NativeArray<int> cellToVertex;
 
 		/// <summary>
-		/// Input vertices to get count from.
+		///   Input vertices to get count from.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]

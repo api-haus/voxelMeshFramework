@@ -292,7 +292,63 @@ JobHandle.ScheduleBatchedJobs();
 - Visual seam tests across chunk borders with varying grid transforms.
 - Stress tests on meshing throughput with many chunks; verify no main-thread stalls.
 - Spatial registration correctness: bounds updates and culling behavior.
- - Propagation correctness: enabling grid-level `NeedsRemesh`/`NeedsManagedMeshUpdate`/`NeedsSpatialUpdate` propagates to all child chunks and clears on the grid; newly created chunks inherit active tags.
+- Propagation correctness: enabling grid-level `NeedsRemesh`/`NeedsManagedMeshUpdate`/`NeedsSpatialUpdate` propagates to all child chunks and clears on the grid; newly created chunks inherit active tags.
+
+#### Testing Implementation Plan
+
+- EditMode unit tests (Editor):
+  - Grid entity creation (bridge)
+    - Grid has `LocalToWorld`, `LocalTransform`, `NativeVoxelGrid`, `Needs*` disabled, `NeedsChunkAllocation` enabled, `LinkedEntityGroup` with root at index 0.
+  - GridChunkAllocationSystem
+    - Chunk count equals `ceil(bounds.size / (voxelSize * EFFECTIVE_CHUNK_SIZE))` per axis (clamped ≤ 64), total matches product.
+    - Chunks contain `LocalToWorld`, `LocalTransform`, `Parent{grid}`, `NativeVoxelChunk` with `coord/gridID/voxelSize/localBounds`, `NativeVoxelMesh.Request{voxelSize}`.
+    - Positions step by `EFFECTIVE_CHUNK_SIZE * voxelSize` from `bounds.min` (rotation=identity, scale=1).
+    - `LinkedEntityGroup` includes all created chunks; `NeedsChunkAllocation` disabled on grid after allocation.
+    - Inheritance: enabling any grid `Needs*` before allocation results in those tags enabled on all new chunks.
+    - Degenerate/zero bounds produce 0 chunks; no exceptions.
+  - GridNeedsTagPropagationSystem
+    - Enabling `NeedsRemesh`/`NeedsManagedMeshUpdate`/`NeedsSpatialUpdate` on grid fans out to all child chunks and clears on the grid (idempotent on repeat).
+    - Multiple tags enabled simultaneously propagate all; `NeedsChunkAllocation` never propagates.
+    - No interaction with `VoxelJobFenceRegistry`.
+  - Meshing lifecycle integration
+    - After allocation, `VoxelMeshAllocationSystem` adds `NativeVoxelMesh` to chunks.
+    - With `VoxelMeshingAlgorithmComponent` present and chunk `NeedsRemesh` enabled: `VoxelMeshingSystem` disables `NeedsRemesh`, enables `NeedsManagedMeshUpdate`, updates fence; `ManagedVoxelMeshingSystem` completes fence and disables `NeedsManagedMeshUpdate`.
+    - Resulting `NativeVoxelMesh` bounds are sane (non-empty when the volume is non-empty).
+
+- PlayMode integration tests:
+  - Authoring→ECS bridge: placing `VoxelMeshGrid` creates the grid entity with expected defaults; enabling `NeedsChunkAllocation` at runtime populates chunks.
+  - End-to-end (if hybrid present): chunks’ MeshFilter/Renderer/Collider update after meshing; grid transform moves propagate to chunk GOs; seams align across borders.
+
+- Performance/stress:
+  - Allocation throughput: time to allocate a 10×10×10 grid; record with `com.unity.test-framework.performance`.
+  - Propagation throughput: enabling grid Needs* for 1k–10k chunks stays within budget.
+  - Meshing throughput (smoke): time for N chunks to complete managed upload.
+
+- Property-based/fuzz:
+  - Vary `bounds.size/min` and `voxelSize`; verify dims formula, placement formula, unique `LinkedEntityGroup` entries, and exact one-time propagation.
+
+- Cleanup & ownership:
+  - Destroying grid destroys linked chunks; verify no entities with `NativeVoxelMesh` remain and no native memory leaks.
+
+- Test utilities & layout:
+  - Helpers to create a temporary `World`, singletons (`EndInitializationEntityCommandBufferSystem.Singleton`, `EndSimulationEntityCommandBufferSystem.Singleton`).
+  - Helpers: `CreateGrid(min,size,voxelSize)`, `RunInitFrame()`, `RunSimFrame()`.
+  - Files:
+    - `Packages/com.voxelmeshframework/Tests/Editor/Grid/GridEntityBridgeTests.cs`
+    - `Packages/com.voxelmeshframework/Tests/Editor/Grid/GridChunkAllocationSystemTests.cs`
+    - `Packages/com.voxelmeshframework/Tests/Editor/Grid/GridNeedsTagPropagationSystemTests.cs`
+    - `Packages/com.voxelmeshframework/Tests/Editor/Grid/GridMeshingLifecycleTests.cs`
+    - `Packages/com.voxelmeshframework/Tests/PlayMode/Grid/GridAuthoringIntegrationTests.cs`
+    - `Packages/com.voxelmeshframework/Tests/Performance/Grid/GridAllocationPerformanceTests.cs`
+    - `Packages/com.voxelmeshframework/Tests/Performance/Grid/GridPropagationPerformanceTests.cs`
+
+- Example assertions:
+  - Chunk count
+    - `expected = ceil(size / (voxelSize * EFFECTIVE_CHUNK_SIZE))` per axis; `total = expected.x * expected.y * expected.z`.
+  - Placement
+    - `expectedPos = bounds.min + coord * (EFFECTIVE_CHUNK_SIZE * voxelSize)` equals `LocalTransform.Position` within epsilon.
+  - Propagation
+    - After enabling a grid tag and updating, all child chunks have the tag enabled; the grid tag is disabled.
 
 ### Roadmap
 1) Rolling Grid (next step)

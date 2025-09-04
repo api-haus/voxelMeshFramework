@@ -6,12 +6,12 @@ namespace Voxels.Core.Meshing.Fairing
 	using Unity.Jobs;
 	using Unity.Mathematics;
 	using static Unity.Mathematics.math;
-	using static Voxels.Core.VoxelConstants;
+	using static VoxelConstants;
 
 	/// <summary>
-	/// Derives cell coordinates for vertices based on their positions.
-	/// This job computes the 3D cell coordinates and linear cell indices
-	/// for each vertex position within the chunk.
+	///   Derives cell coordinates for vertices based on their positions.
+	///   This job computes the 3D cell coordinates and linear cell indices
+	///   for each vertex position within the chunk.
 	/// </summary>
 	[BurstCompile(
 		Debug = false,
@@ -24,32 +24,32 @@ namespace Voxels.Core.Meshing.Fairing
 	public struct DeriveCellCoordsJob : IJob
 	{
 		/// <summary>
-		/// Input vertex positions in world space.
+		///   Input vertex positions in world space.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeList<float3> positions;
 
 		/// <summary>
-		/// Size of each voxel in world units.
+		///   Size of each voxel in world units.
 		/// </summary>
 		[ReadOnly]
 		public float voxelSize;
 
 		/// <summary>
-		/// Output cell coordinates for each vertex.
+		///   Output cell coordinates for each vertex.
 		/// </summary>
 		[NoAlias]
 		public NativeList<int3> cellCoords;
 
 		/// <summary>
-		/// Output linear cell indices for each vertex.
+		///   Output linear cell indices for each vertex.
 		/// </summary>
 		[NoAlias]
 		public NativeList<int> cellLinearIndex;
 
 		/// <summary>
-		/// Input vertices to get count from.
+		///   Input vertices to get count from.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
@@ -69,7 +69,7 @@ namespace Voxels.Core.Meshing.Fairing
 				// Convert world position to cell coordinates within the chunk.
 				// Add small epsilon to handle floating point precision issues.
 				var position = positions[index];
-				var cellCoord = (int3)floor(position / voxelSize + 1e-6f);
+				var cellCoord = (int3)floor((position / voxelSize) + 1e-6f);
 
 				// ===== BOUNDS CLAMPING =====
 				// Ensure cell coordinates are within valid chunk bounds [0, CHUNK_SIZE-1].

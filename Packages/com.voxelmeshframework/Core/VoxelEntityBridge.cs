@@ -141,7 +141,7 @@ namespace Voxels.Core
 		}
 
 		public static Entity CreateVoxelMeshGridEntity(
-			this VoxelMeshGrid vmg,
+			this VoxelMeshGrid vm,
 			int instanceId,
 			Transform attachTransform = null
 		)
@@ -157,13 +157,19 @@ namespace Voxels.Core
 					typeof(LocalTransform),
 					typeof(NativeVoxelGrid),
 					typeof(EntityGameObjectInstanceIDAttachment),
+					typeof(NeedsRemesh),
+					typeof(NeedsManagedMeshUpdate),
+					typeof(NeedsSpatialUpdate),
+					typeof(NeedsChunkAllocation),
+					typeof(ChunkPrefabSettings),
+					typeof(VoxelMeshingAlgorithmComponent),
 				}
 			);
 
 			if (attachTransform)
 				types.Add(typeof(EntityGameObjectTransformAttachment));
 
-			if (vmg.procedural)
+			if (vm.procedural)
 			{
 				types.Add(typeof(PopulateWithProceduralVoxelGenerator));
 				types.Add(typeof(NeedsProceduralUpdate));
@@ -171,44 +177,75 @@ namespace Voxels.Core
 
 			var ent = em.CreateEntity(types.ToArray());
 
+			// Initialize enableable tags on grid root
+			em.SetComponentEnabled<NeedsRemesh>(ent, false);
+			em.SetComponentEnabled<NeedsSpatialUpdate>(ent, false);
+			em.SetComponentEnabled<NeedsChunkAllocation>(ent, true);
+			em.SetComponentEnabled<NeedsManagedMeshUpdate>(ent, false);
+
 			em.SetComponentData(
 				ent,
 				new NativeVoxelGrid
 				{
 					//
 					gridID = instanceId,
-					voxelSize = vmg.voxelSize,
-					bounds = new(vmg.worldBounds.min, vmg.worldBounds.max),
+					voxelSize = vm.voxelSize,
+					bounds = new(vm.worldBounds.min, vm.worldBounds.max),
 				}
 			);
 			em.SetComponentData(
 				ent,
 				new EntityGameObjectInstanceIDAttachment { gameObjectInstanceID = instanceId }
 			);
-			em.SetComponentData(ent, new LocalToWorld { Value = vmg.transform.localToWorldMatrix });
+			em.SetComponentData(ent, new LocalToWorld { Value = vm.transform.localToWorldMatrix });
 			em.SetComponentData(
 				ent,
 				new LocalTransform
 				{
-					Position = vmg.transform.position,
-					Rotation = vmg.transform.rotation,
-					Scale = cmax(vmg.transform.localScale),
+					Position = vm.transform.position,
+					Rotation = vm.transform.rotation,
+					Scale = cmax(vm.transform.localScale),
 				}
 			);
 			em.SetComponentData(ent, new NeedsSpatialUpdate { persistent = attachTransform });
 
+			// Provide chunk prefab + material settings for hybrid instantiation
+			em.SetComponentData(
+				ent,
+				new ChunkPrefabSettings { prefab = vm.chunkPrefab, defaultMaterial = vm.surfaceMaterial }
+			);
+
+			em.SetComponentData(
+				ent,
+				new VoxelMeshingAlgorithmComponent
+				{
+					algorithm = vm.meshingAlgorithm,
+					enableFairing = vm.enableFairing,
+					fairingIterations = vm.fairingIterations,
+					fairingStepSize = vm.fairingStepSize,
+					cellMargin = vm.cellMargin,
+					recomputeNormalsAfterFairing = vm.recomputeNormalsAfterFairing,
+					materialDistributionMode = vm.materialDistributionMode,
+				}
+			);
 			if (attachTransform)
 				em.SetComponentData(
 					ent,
 					new EntityGameObjectTransformAttachment { attachTo = attachTransform }
 				);
-			if (vmg.procedural)
+			if (vm.procedural)
 			{
 				em.SetComponentData(
 					ent,
-					new PopulateWithProceduralVoxelGenerator { generator = vmg.procedural }
+					new PopulateWithProceduralVoxelGenerator { generator = vm.procedural }
 				);
 				em.SetComponentEnabled<NeedsProceduralUpdate>(ent, true);
+			}
+
+			// Ensure LinkedEntityGroup buffer exists and contains root for lifecycle management
+			{
+				var leg = em.AddBuffer<LinkedEntityGroup>(ent);
+				leg.Add(ent);
 			}
 
 			return ent;

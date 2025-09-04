@@ -3,14 +3,11 @@ namespace Voxels.Core.Grids
 	using System;
 	using Unity.Entities;
 	using Unity.Mathematics;
-	using Unity.Mathematics.Geometry;
 
 	public struct NativeVoxelChunk : IComponentData, IEquatable<NativeVoxelChunk>
 	{
 		public int3 coord;
 		public int gridID;
-		public float voxelSize;
-		public MinMaxAABB localBounds;
 
 		public bool Equals(NativeVoxelChunk other)
 		{

@@ -3,16 +3,15 @@ namespace Voxels.Core.Meshing.Fairing
 	using ThirdParty.SurfaceNets;
 	using Unity.Burst;
 	using Unity.Collections;
-	using Unity.Collections.LowLevel.Unsafe;
 	using Unity.Jobs;
 	using Unity.Mathematics;
 	using static Unity.Mathematics.math;
-	using static Voxels.Core.VoxelConstants;
+	using static VoxelConstants;
 
 	/// <summary>
-	/// Builds precomputed neighbor adjacency data for efficient surface fairing.
-	/// This job constructs face-neighbor relationships using the dense cell map
-	/// for O(1) neighbor lookups during fairing iterations.
+	///   Builds precomputed neighbor adjacency data for efficient surface fairing.
+	///   This job constructs face-neighbor relationships using the dense cell map
+	///   for O(1) neighbor lookups during fairing iterations.
 	/// </summary>
 	[BurstCompile(
 		Debug = false,
@@ -25,33 +24,33 @@ namespace Voxels.Core.Meshing.Fairing
 	public struct BuildNeighborsJob : IJob
 	{
 		/// <summary>
-		/// Input cell coordinates for each vertex.
+		///   Input cell coordinates for each vertex.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeList<int3> cellCoords;
 
 		/// <summary>
-		/// Input dense cell-to-vertex mapping.
+		///   Input dense cell-to-vertex mapping.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
 		public NativeArray<int> cellToVertex;
 
 		/// <summary>
-		/// Output neighbor index ranges (start, count) for each vertex.
+		///   Output neighbor index ranges (start, count) for each vertex.
 		/// </summary>
 		[NoAlias]
 		public NativeList<int2> neighborIndexRanges;
 
 		/// <summary>
-		/// Output flattened array of neighbor vertex indices.
+		///   Output flattened array of neighbor vertex indices.
 		/// </summary>
 		[NoAlias]
 		public NativeList<int> neighborIndices;
 
 		/// <summary>
-		/// Input vertices to get count from.
+		///   Input vertices to get count from.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]

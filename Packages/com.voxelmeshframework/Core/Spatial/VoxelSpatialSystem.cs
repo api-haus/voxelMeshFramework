@@ -4,7 +4,6 @@ namespace Voxels.Core.Spatial
 	using Authoring;
 	using Debugging;
 	using Grids;
-	using Meshing;
 	using Meshing.Tags;
 	using Unity.Burst;
 	using Unity.Collections;
@@ -19,9 +18,7 @@ namespace Voxels.Core.Spatial
 	using static Unity.Mathematics.math;
 	using static VoxelConstants;
 	using EndInitST = Unity.Entities.EndInitializationEntityCommandBufferSystem.Singleton;
-	using float4x4 = Unity.Mathematics.float4x4;
 
-	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[UpdateInGroup(typeof(InitializationSystemGroup))]
 	public partial struct VoxelSpatialSystem : ISystem
 	{
@@ -62,34 +59,9 @@ namespace Voxels.Core.Spatial
 			st.hash.Clear();
 
 			foreach (
-				var (chunkRef, voxelMeshRef, spatialRef, entity) in Query<
-					RefRO<NativeVoxelChunk>,
-					RefRO<NativeVoxelMesh>,
-					RefRO<NeedsSpatialUpdate>
-				>()
-					.WithEntityAccess()
-					.WithAll<NeedsSpatialUpdate>()
-			)
-			{
-				st.Add(
-					new SpatialVoxelObject
-					{
-						entity = entity,
-						localBounds = chunkRef.ValueRO.localBounds,
-						voxelSize = chunkRef.ValueRO.voxelSize,
-						ltw = float4x4.identity, // todo
-						wtl = float4x4.identity,
-					}
-				);
-
-				ecb.SetComponentEnabled<NeedsSpatialUpdate>(entity, spatialRef.ValueRO.persistent);
-			}
-
-			foreach (
-				var (objectRef, ltwRef, voxelMeshRef, spatialRef, entity) in Query<
+				var (objectRef, ltwRef, spatialRef, entity) in Query<
 					RefRO<NativeVoxelObject>,
 					RefRO<LocalToWorld>,
-					RefRO<NativeVoxelMesh>,
 					RefRO<NeedsSpatialUpdate>
 				>()
 					.WithEntityAccess()

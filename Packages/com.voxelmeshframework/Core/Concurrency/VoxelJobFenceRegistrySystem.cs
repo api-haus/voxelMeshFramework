@@ -78,7 +78,6 @@ namespace Voxels.Core.Concurrency
 		class RegistryContext { }
 	}
 
-	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[UpdateInGroup(typeof(SimulationSystemGroup), OrderFirst = true)]
 	public partial struct VoxelJobFenceRegistrySystem : ISystem
 	{

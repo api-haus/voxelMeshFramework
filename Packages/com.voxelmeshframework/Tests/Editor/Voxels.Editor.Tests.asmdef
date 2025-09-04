@@ -9,6 +9,7 @@
 		"Unity.Collections",
 		"Unity.Burst",
 		"Unity.Entities",
+		"Unity.Transforms",
 		"Voxels.Core",
 		"Voxels.Runtime"
 	],

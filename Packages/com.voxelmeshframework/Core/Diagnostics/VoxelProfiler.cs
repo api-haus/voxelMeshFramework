@@ -88,9 +88,8 @@ namespace Voxels.Core.Diagnostics
 				"Voxels/Hybrid/TransformUpdate"
 			);
 
-			public static readonly ProfilerMarker EntityGameObjectTransformSystem_UpdateLTW = new(
-				"Voxels/Hybrid/UpdateLocalTransform"
-			);
+			public static readonly ProfilerMarker EntityGameObjectTransformSystem_UpdateLocalTransform =
+				new("Voxels/Hybrid/UpdateLocalTransform");
 
 			public static readonly ProfilerMarker EntityGameObjectTransformSystem_UpdateLocalToWorld =
 				new("Voxels/Hybrid/UpdateLocalToWorld");

@@ -1,6 +1,8 @@
 namespace Voxels.Core.Stamps
 {
 	using Authoring;
+	using Concurrency;
+	using Meshing;
 	using Meshing.Systems;
 	using Meshing.Tags;
 	using Unity.Burst;
@@ -8,7 +10,6 @@ namespace Voxels.Core.Stamps
 	using Unity.Entities;
 	using Unity.Jobs;
 	using UnityEngine;
-	using Voxels.Core.Concurrency;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
@@ -17,7 +18,6 @@ namespace Voxels.Core.Stamps
 	using Debugging;
 #endif
 
-	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[UpdateBefore(typeof(VoxelMeshingSystem))]
 	public partial struct VoxelStampSystem : ISystem
 	{
@@ -61,7 +61,7 @@ namespace Voxels.Core.Stamps
 				foreach (var spatialVoxelObject in chunksInBounds)
 				{
 					// Use the entity's NativeVoxelMesh buffers directly to preserve safety handles
-					var nvmRw = GetComponentRW<Meshing.NativeVoxelMesh>(spatialVoxelObject.entity);
+					var nvmRw = GetComponentRW<NativeVoxelMesh>(spatialVoxelObject.entity);
 					ref var nvm = ref nvmRw.ValueRW;
 					var sdf = nvm.volume.sdfVolume;
 					var mat = nvm.volume.materials;

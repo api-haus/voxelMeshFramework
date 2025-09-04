@@ -4,7 +4,6 @@ namespace Voxels.Core.Config
 	using Unity.Entities;
 	using UnityEngine;
 
-	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[UpdateInGroup(typeof(InitializationSystemGroup), OrderFirst = true)]
 	public partial struct VoxelProjectBootstrapSystem : ISystem
 	{

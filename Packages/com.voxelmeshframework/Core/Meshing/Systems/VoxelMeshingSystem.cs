@@ -1,30 +1,24 @@
 namespace Voxels.Core.Meshing.Systems
 {
 	using System;
-	using Fairing;
+	using Concurrency;
 	using Tags;
 	using Unity.Burst;
 	using Unity.Entities;
 	using Unity.Jobs;
+	using Unity.Logging;
 	using UnityEngine;
-	using Voxels.Core.Concurrency;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 
-	[WorldSystemFilter(WorldSystemFilterFlags.Default | WorldSystemFilterFlags.Editor)]
 	[RequireMatchingQueriesForUpdate]
 	public partial struct VoxelMeshingSystem : ISystem
 	{
-		// EntityQuery m_NeedsRemeshQuery;
-
 		[BurstCompile]
 		public void OnCreate(ref SystemState state)
 		{
 			state.RequireForUpdate<EndSimST>();
-
-			// m_NeedsRemeshQuery = QueryBuilder().WithAll<NativeVoxelMesh, NeedsRemesh>().Build();
-			// state.RequireForUpdate(m_NeedsRemeshQuery);
 		}
 
 		[BurstCompile]
@@ -34,7 +28,7 @@ namespace Voxels.Core.Meshing.Systems
 
 			var ecb = GetSingleton<EndSimST>().CreateCommandBuffer(state.WorldUnmanaged);
 
-			// enqueue
+			// schedule meshing
 			foreach (
 				var (nativeVoxelMeshRef, algorithm, entity) in Query<
 					RefRW<NativeVoxelMesh>,
@@ -52,16 +46,18 @@ namespace Voxels.Core.Meshing.Systems
 
 				ref var nvm = ref nativeVoxelMeshRef.ValueRW;
 
-				if (nvm.meshing.meshData.Length == 0)
-					nvm.meshing.meshData = Mesh.AllocateWritableMeshData(1);
+				if (nvm.meshing.meshData.Length != 0)
+					Log.Warning("mesh data is non zero when remeshing");
+
+				nvm.meshing.meshData = Mesh.AllocateWritableMeshData(1);
 
 				// Prepare input/output data
 				var input = new MeshingInputData
 				{
 					volume = nvm.volume.sdfVolume,
 					materials = nvm.volume.materials,
-					edgeTable = SharedStaticMeshingResources.EdgeTable,
 					voxelSize = nvm.volume.voxelSize,
+					edgeTable = SharedStaticMeshingResources.EdgeTable,
 					chunkSize = VoxelConstants.CHUNK_SIZE,
 					normalsMode =
 						algorithm.enableFairing && algorithm.recomputeNormalsAfterFairing
@@ -85,20 +81,16 @@ namespace Voxels.Core.Meshing.Systems
 				{
 					case VoxelMeshingAlgorithm.NAIVE_SURFACE_NETS:
 						if (algorithm.enableFairing)
-						{
 							meshingJob = new NaiveSurfaceNetsFairingScheduler
 							{
-								fairingBuffers = nvm.meshing.fairing,
-								fairingIterations = algorithm.fairingIterations,
-								fairingStepSize = algorithm.fairingStepSize,
 								cellMargin = algorithm.cellMargin,
+								fairingBuffers = nvm.meshing.fairing,
+								fairingStepSize = algorithm.fairingStepSize,
+								fairingIterations = algorithm.fairingIterations,
 								recomputeNormalsAfterFairing = algorithm.recomputeNormalsAfterFairing,
 							}.Schedule(input, output, pre);
-						}
 						else
-						{
 							meshingJob = new NaiveSurfaceNetsScheduler().Schedule(input, output, pre);
-						}
 						break;
 					case VoxelMeshingAlgorithm.DUAL_CONTOURING:
 						meshingJob = pre;
@@ -130,110 +122,5 @@ namespace Voxels.Core.Meshing.Systems
 
 		[BurstCompile]
 		public void OnDestroy(ref SystemState state) { }
-
-		/// <summary>
-		///   Schedules NaiveSurfaceNets with optional surface fairing post-processing.
-		///   Uses pre-allocated buffers and maintains complete async job chain.
-		/// </summary>
-		JobHandle ScheduleNaiveSurfaceNetsWithOptionalFairing(
-			VoxelMeshingAlgorithmComponent algorithm,
-			in MeshingInputData input,
-			in MeshingOutputData output,
-			FairingBuffers fairingBuffers,
-			JobHandle inputDeps
-		)
-		{
-			// ===== SCHEDULE BASE NAIVE SURFACE NETS =====
-			var meshingJob = new NaiveSurfaceNetsScheduler().Schedule(input, output, inputDeps);
-
-			// ===== EARLY EXIT IF FAIRING DISABLED =====
-			if (!algorithm.enableFairing)
-				return meshingJob;
-
-			// ===== USE PRE-ALLOCATED FAIRING BUFFERS =====
-			// Use pre-allocated buffers and maintain async job chain
-
-			// ===== FAIRING PIPELINE: ASYNC JOB CHAIN =====
-			var job1 = new ExtractVertexDataJob
-			{
-				vertices = output.vertices,
-				outPositions = fairingBuffers.positionsA,
-				outMaterialIds = fairingBuffers.materialIds,
-				outMaterialWeights = fairingBuffers.materialWeights,
-			}.Schedule(meshingJob);
-
-			var job2 = new DeriveCellCoordsJob
-			{
-				vertices = output.vertices,
-				positions = fairingBuffers.positionsA,
-				voxelSize = input.voxelSize,
-				cellCoords = fairingBuffers.cellCoords,
-				cellLinearIndex = fairingBuffers.cellLinearIndex,
-			}.Schedule(job1);
-
-			var job3 = new BuildCellToVertexMapJob
-			{
-				vertices = output.vertices,
-				cellLinearIndex = fairingBuffers.cellLinearIndex,
-				cellToVertex = fairingBuffers.cellToVertex,
-			}.Schedule(job2);
-
-			var job4 = new BuildNeighborsJob
-			{
-				vertices = output.vertices,
-				cellCoords = fairingBuffers.cellCoords,
-				cellToVertex = fairingBuffers.cellToVertex,
-				neighborIndexRanges = fairingBuffers.neighborIndexRanges,
-				neighborIndices = fairingBuffers.neighborIndices,
-			}.Schedule(job3);
-
-			// ===== FAIRING ITERATIONS WITH PING-PONG =====
-			var currentJobHandle = job4;
-			var usePositionsB = false;
-
-			for (var iteration = 0; iteration < algorithm.fairingIterations; iteration++)
-			{
-				var inBuffer = usePositionsB ? fairingBuffers.positionsB : fairingBuffers.positionsA;
-				var outBuffer = usePositionsB ? fairingBuffers.positionsA : fairingBuffers.positionsB;
-
-				currentJobHandle = new SurfaceFairingJob
-				{
-					vertices = output.vertices,
-					inPositions = inBuffer,
-					neighborIndexRanges = fairingBuffers.neighborIndexRanges,
-					neighborIndices = fairingBuffers.neighborIndices,
-					materialId = fairingBuffers.materialIds,
-					materialWeights = fairingBuffers.materialWeights,
-					cellCoords = fairingBuffers.cellCoords,
-					outPositions = outBuffer,
-					voxelSize = input.voxelSize,
-					cellMargin = algorithm.cellMargin,
-					fairingStepSize = algorithm.fairingStepSize,
-				}.Schedule(currentJobHandle);
-
-				usePositionsB = !usePositionsB; // Toggle buffers
-			}
-
-			// ===== UPDATE VERTICES WITH FINAL POSITIONS =====
-			var finalPositions = usePositionsB ? fairingBuffers.positionsB : fairingBuffers.positionsA;
-			var updateVerticesJob = new UpdateVertexPositionsJob
-			{
-				vertices = output.vertices,
-				newPositions = finalPositions,
-			}.Schedule(currentJobHandle);
-
-			// ===== OPTIONAL NORMALS RECALCULATION =====
-			var finalJob = updateVerticesJob;
-			if (algorithm.recomputeNormalsAfterFairing)
-			{
-				finalJob = new RecalculateNormalsJob
-				{
-					indices = output.indices.AsDeferredJobArray(),
-					vertices = output.vertices,
-				}.Schedule(finalJob);
-			}
-
-			return finalJob;
-		}
 	}
 }
