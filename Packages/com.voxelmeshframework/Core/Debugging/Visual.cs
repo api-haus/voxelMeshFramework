@@ -47,8 +47,5 @@ namespace Voxels.Core.Debugging
 			public void Dispose() { }
 #endif
 		}
-
-#if ALINE
-#endif
 	}
 }

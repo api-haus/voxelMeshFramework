@@ -107,7 +107,7 @@ namespace Voxels.Core.Spatial
 					hash.Add(new int3(x, y, z), s);
 
 #if ALINE && DEBUG
-					if (VoxelDebugging.IsEnabled)
+					if (VoxelDebugging.IsEnabled && VoxelDebugging.Flags.spatialSystemGizmos)
 					{
 						var min = new int3(x, y, z) * s_cellSize;
 						var max = min + s_cellSize;
@@ -122,7 +122,7 @@ namespace Voxels.Core.Spatial
 				}
 
 #if ALINE && DEBUG
-				if (VoxelDebugging.IsEnabled)
+				if (VoxelDebugging.IsEnabled && VoxelDebugging.Flags.spatialSystemGizmos)
 				{
 					Visual.Draw.PushDuration(.33f);
 					Visual.Draw.WireBox(worldBounds.Center, worldBounds.Extents * 1.01f, Color.green);
@@ -142,18 +142,31 @@ namespace Voxels.Core.Spatial
 			{
 				using var _ = VoxelSpatialSystem_Query.Auto();
 
-				var cell = (int3)floor(queryWorldBounds.Center / s_cellSize);
+				// Cover all spatial hash cells overlapped by the query bounds, not just the center cell.
+				var cellMin = (int3)floor(queryWorldBounds.Min / s_cellSize);
+				var cellMax = (int3)ceil(queryWorldBounds.Max / s_cellSize);
 
-				using var values = hash.GetValuesForKey(cell);
+				NativeList<SpatialVoxelObject> list = new(4, allocator);
+				using var seen = new NativeParallelHashSet<Entity>(4, allocator);
 
-				NativeList<SpatialVoxelObject> list = new(1, allocator);
-				foreach (var spatialVoxelObject in values)
+				for (var x = cellMin.x; x <= cellMax.x; x++)
+				for (var y = cellMin.y; y <= cellMax.y; y++)
+				for (var z = cellMin.z; z <= cellMax.z; z++)
 				{
-					var localObjectBounds = spatialVoxelObject.localBounds;
-					var localQueryBounds = Transform(spatialVoxelObject.wtl, queryWorldBounds);
+					var cell = new int3(x, y, z);
+					using var values = hash.GetValuesForKey(cell);
+					foreach (var spatialVoxelObject in values)
+					{
+						// De-duplicate objects that straddle multiple cells
+						if (!seen.Add(spatialVoxelObject.entity))
+							continue;
 
-					if (localObjectBounds.Overlaps(localQueryBounds))
-						list.Add(spatialVoxelObject);
+						var localObjectBounds = spatialVoxelObject.localBounds;
+						var localQueryBounds = Transform(spatialVoxelObject.wtl, queryWorldBounds);
+
+						if (localObjectBounds.Overlaps(localQueryBounds))
+							list.Add(spatialVoxelObject);
+					}
 				}
 
 				return list;

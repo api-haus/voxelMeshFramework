@@ -2,10 +2,6 @@ namespace Voxels.Core.Config
 {
 	using UnityEngine;
 
-	[CreateAssetMenu(
-		menuName = "Voxel Mesh Framework/Project Settings",
-		fileName = "VoxelProjectSettings"
-	)]
 	public sealed class VoxelProjectSettings : ScriptableObject
 	{
 		[Header("Scheduling")]

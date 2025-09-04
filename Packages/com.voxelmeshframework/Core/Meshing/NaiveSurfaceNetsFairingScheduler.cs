@@ -5,7 +5,7 @@ namespace Voxels.Core.Meshing
 	using Unity.Jobs;
 
 	/// <summary>
-	/// Scheduler that runs NaiveSurfaceNets then applies the fairing post-process pipeline using preallocated buffers.
+	///   Scheduler that runs NaiveSurfaceNets then applies the fairing post-process pipeline using preallocated buffers.
 	/// </summary>
 	[BurstCompile]
 	public struct NaiveSurfaceNetsFairingScheduler : IMeshingAlgorithmScheduler
@@ -15,6 +15,9 @@ namespace Voxels.Core.Meshing
 		public float fairingStepSize;
 		public float cellMargin;
 		public bool recomputeNormalsAfterFairing;
+		public SeamConstraintMode seamConstraintMode;
+		public float seamConstraintWeight;
+		public int seamBandWidth;
 
 		public JobHandle Schedule(
 			in MeshingInputData input,
@@ -79,6 +82,9 @@ namespace Voxels.Core.Meshing
 					voxelSize = input.voxelSize,
 					cellMargin = cellMargin,
 					fairingStepSize = fairingStepSize,
+					seamConstraintMode = seamConstraintMode,
+					seamConstraintWeight = seamConstraintWeight,
+					seamBandWidth = seamBandWidth,
 				}.Schedule(meshingJob);
 
 				usePositionsB = !usePositionsB;
@@ -94,13 +100,11 @@ namespace Voxels.Core.Meshing
 
 			// optional normals recompute — single-pass in-place
 			if (recomputeNormalsAfterFairing)
-			{
 				meshingJob = new RecalculateNormalsJob
 				{
 					indices = output.indices.AsDeferredJobArray(),
 					vertices = output.vertices,
 				}.Schedule(meshingJob);
-			}
 
 			return meshingJob;
 		}

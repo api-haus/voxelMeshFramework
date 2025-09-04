@@ -17,11 +17,17 @@ namespace Voxels.Core.Meshing
 	public enum VoxelMeshingAlgorithm : byte
 	{
 		/// <summary>
-		///   Surface Nets with optional fairing and material support.
-		///   Configure fairing through enableFairing flag and related settings.
+		///   Surface Nets with material support.
 		/// </summary>
-		[InspectorName("Naïve Surface Nets")]
+		[InspectorName("Surface Nets")]
 		NAIVE_SURFACE_NETS = 0,
+
+		/// <summary>
+		///   Surface Nets with fairing and material support.
+		///   Configure fairing through related settings.
+		/// </summary>
+		[InspectorName("Surface Nets with Fairing (Sharp details)")]
+		FAIRED_SURFACE_NETS = 1,
 
 		/// <summary>
 		///   Dual Contouring algorithm (future implementation).
@@ -58,16 +64,19 @@ namespace Voxels.Core.Meshing
 		/// <summary>
 		///   Do not compute normals in the base meshing job. Useful when a later pass will recompute normals.
 		/// </summary>
+		[InspectorName("Do not compute normals")]
 		NONE = 0,
 
 		/// <summary>
 		///   Compute normals from the voxel field gradient during vertex generation (fast, approximate).
 		/// </summary>
+		[InspectorName("Compute normals from SDF gradient")]
 		GRADIENT = 1,
 
 		/// <summary>
 		///   Compute normals from triangle geometry after indices are produced (higher quality, slower).
 		/// </summary>
+		[InspectorName("Compute normals from triangle geometry")]
 		TRIANGLE_GEOMETRY = 2,
 	}
 
@@ -126,6 +135,12 @@ namespace Voxels.Core.Meshing
 		///   How to distribute materials to vertices.
 		/// </summary>
 		public MaterialDistributionMode materialDistributionMode;
+
+		/// <summary>
+		/// 	When true, schedule a post-meshing job to copy interior border samples
+		/// 	into apron layers to improve cross-chunk continuity.
+		/// </summary>
+		public bool copyApronPostMesh;
 	}
 
 	/// <summary>
@@ -166,13 +181,18 @@ namespace Voxels.Core.Meshing
 	public struct VoxelMeshingAlgorithmComponent : IComponentData
 	{
 		public VoxelMeshingAlgorithm algorithm;
+		public NormalsMode normalsMode;
 
 		// Surface fairing parameters
-		public bool enableFairing;
 		public int fairingIterations;
 		public float fairingStepSize;
 		public float cellMargin;
 		public bool recomputeNormalsAfterFairing;
+
+		// Seam handling
+		public SeamConstraintMode seamConstraintMode;
+		public float seamConstraintWeight; // 0..1 multiplier for step near seams
+		public int seamBandWidth; // cells
 
 		// Material distribution
 		public MaterialDistributionMode materialDistributionMode;
@@ -184,12 +204,22 @@ namespace Voxels.Core.Meshing
 			new()
 			{
 				algorithm = VoxelMeshingAlgorithm.NAIVE_SURFACE_NETS,
-				enableFairing = false,
 				fairingIterations = 5,
 				fairingStepSize = 0.6f,
 				cellMargin = 0.1f,
+				normalsMode = NormalsMode.GRADIENT,
 				recomputeNormalsAfterFairing = false,
+				seamConstraintMode = SeamConstraintMode.SoftBand,
+				seamConstraintWeight = 0.5f,
+				seamBandWidth = 2,
 				materialDistributionMode = MaterialDistributionMode.BLENDED_CORNER_SUM,
 			};
+	}
+
+	public enum SeamConstraintMode : byte
+	{
+		None = 0,
+		Freeze = 1,
+		SoftBand = 2,
 	}
 }

@@ -1,10 +1,13 @@
 namespace Voxels.Core.Meshing.Fairing
 {
+	using System.Runtime.CompilerServices;
 	using ThirdParty.SurfaceNets;
 	using Unity.Burst;
 	using Unity.Collections;
 	using Unity.Jobs;
 	using Unity.Mathematics;
+	using Voxels.Core;
+	using Voxels.Core.Meshing;
 	using static Unity.Mathematics.math;
 
 	/// <summary>
@@ -88,6 +91,16 @@ namespace Voxels.Core.Meshing.Fairing
 		[ReadOnly]
 		public float fairingStepSize;
 
+		// Seam constraints
+		[ReadOnly]
+		public SeamConstraintMode seamConstraintMode;
+
+		[ReadOnly]
+		public float seamConstraintWeight;
+
+		[ReadOnly]
+		public int seamBandWidth;
+
 		/// <summary>
 		///   Input vertices to get count from.
 		/// </summary>
@@ -113,13 +126,16 @@ namespace Voxels.Core.Meshing.Fairing
 				var neighborRange = neighborIndexRanges[vertexIndex];
 				var neighborAverage = CalculateNeighborAverage(vertexIndex, neighborRange, currentPos);
 
-				// ===== ADAPTIVE STEP SIZE (WEIGHT DIVERGENCE) =====
-				// Reduce step size near transitions detected via material weight divergence.
+				// ===== ADAPTIVE STEP SIZE (WEIGHT DIVERGENCE + SEAM) =====
+				// Reduce step size near material transitions; apply seam constraint if in seam band.
 				var adaptiveStep = GetAdaptiveStepSize(vertexIndex, neighborRange);
+				adaptiveStep = ApplySeamConstraint(adaptiveStep, cellCoord);
 
 				// ===== FAIRING STEP =====
 				// Move toward neighbor average: p' = p + α * (avg - p)
-				var newPos = currentPos + (adaptiveStep * (neighborAverage - currentPos));
+				var rawDelta = neighborAverage - currentPos;
+				var newDelta = ApplySeamProjection(adaptiveStep * rawDelta, cellCoord);
+				var newPos = currentPos + newDelta;
 
 				// ===== CELL CONSTRAINT ENFORCEMENT =====
 				// Clamp vertex to original cell bounds with scaled margin.
@@ -194,6 +210,65 @@ namespace Voxels.Core.Meshing.Fairing
 
 			var beta = min(betaDiv, betaConf);
 			return baseStep * beta;
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		float3 ApplySeamProjection(float3 delta, int3 cellCoord)
+		{
+			if (seamConstraintMode == SeamConstraintMode.None)
+				return delta;
+
+			var inLowX = cellCoord.x < seamBandWidth;
+			var inHighX = cellCoord.x >= (VoxelConstants.CHUNK_SIZE - seamBandWidth);
+			var inLowY = cellCoord.y < seamBandWidth;
+			var inHighY = cellCoord.y >= (VoxelConstants.CHUNK_SIZE - seamBandWidth);
+			var inLowZ = cellCoord.z < seamBandWidth;
+			var inHighZ = cellCoord.z >= (VoxelConstants.CHUNK_SIZE - seamBandWidth);
+
+			var inAnyBand = inLowX || inHighX || inLowY || inHighY || inLowZ || inHighZ;
+			if (!inAnyBand)
+				return delta;
+
+			if (seamConstraintMode == SeamConstraintMode.Freeze)
+				return float3(0f, 0f, 0f);
+
+			// SoftBand: block movement orthogonal to seam planes
+			var result = delta;
+			if (inLowX || inHighX)
+				result.x = 0f;
+			if (inLowY || inHighY)
+				result.y = 0f;
+			if (inLowZ || inHighZ)
+				result.z = 0f;
+			return result;
+		}
+
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		float ApplySeamConstraint(float step, int3 cellCoord)
+		{
+			if (seamConstraintMode == SeamConstraintMode.None)
+				return step;
+
+			var inLowX = cellCoord.x < seamBandWidth;
+			var inHighX = cellCoord.x >= (VoxelConstants.CHUNK_SIZE - seamBandWidth);
+			var inLowY = cellCoord.y < seamBandWidth;
+			var inHighY = cellCoord.y >= (VoxelConstants.CHUNK_SIZE - seamBandWidth);
+			var inLowZ = cellCoord.z < seamBandWidth;
+			var inHighZ = cellCoord.z >= (VoxelConstants.CHUNK_SIZE - seamBandWidth);
+			var inAnyBand = inLowX || inHighX || inLowY || inHighY || inLowZ || inHighZ;
+
+			if (!inAnyBand)
+				return step;
+
+			switch (seamConstraintMode)
+			{
+				case SeamConstraintMode.Freeze:
+					return 0f;
+				case SeamConstraintMode.SoftBand:
+					return step * seamConstraintWeight;
+				default:
+					return step;
+			}
 		}
 
 		/// <summary>

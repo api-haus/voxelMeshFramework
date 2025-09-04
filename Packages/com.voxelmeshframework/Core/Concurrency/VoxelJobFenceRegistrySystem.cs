@@ -9,7 +9,7 @@ namespace Voxels.Core.Concurrency
 	{
 		static readonly SharedStatic<NativeParallelHashMap<Entity, JobHandle>> s_fences = SharedStatic<
 			NativeParallelHashMap<Entity, JobHandle>
-		>.GetOrCreate<RegistryContext, FencesKey>();
+		>.GetOrCreate<FencesKey>();
 
 		public static void Initialize(int capacity = 16384)
 		{
@@ -24,17 +24,17 @@ namespace Voxels.Core.Concurrency
 				s_fences.Data.Dispose();
 		}
 
-		public static JobHandle Get(Entity e)
+		public static JobHandle GetFence(Entity e)
 		{
 			return s_fences.Data.IsCreated && s_fences.Data.TryGetValue(e, out var h) ? h : default;
 		}
 
 		public static JobHandle Tail(Entity e)
 		{
-			return Get(e);
+			return GetFence(e);
 		}
 
-		public static void Update(Entity e, JobHandle handle)
+		public static void UpdateFence(Entity e, JobHandle handle)
 		{
 			if (!s_fences.Data.IsCreated)
 				return;
@@ -50,7 +50,7 @@ namespace Voxels.Core.Concurrency
 
 		public static void CompleteAndReset(Entity e)
 		{
-			var h = Get(e);
+			var h = GetFence(e);
 			h.Complete();
 			Reset(e);
 		}
@@ -74,8 +74,6 @@ namespace Voxels.Core.Concurrency
 		}
 
 		class FencesKey { }
-
-		class RegistryContext { }
 	}
 
 	[UpdateInGroup(typeof(SimulationSystemGroup), OrderFirst = true)]

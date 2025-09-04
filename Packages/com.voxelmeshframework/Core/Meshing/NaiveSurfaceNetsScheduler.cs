@@ -5,8 +5,8 @@ namespace Voxels.Core.Meshing
 	using Unity.Jobs;
 
 	/// <summary>
-	/// Scheduler for the basic Surface Nets algorithm without materials or smoothing.
-	/// This is the fastest meshing algorithm, suitable for collision meshes.
+	///   Scheduler for the basic Surface Nets algorithm without materials or smoothing.
+	///   This is the fastest meshing algorithm, suitable for collision meshes.
 	/// </summary>
 	[BurstCompile]
 	public struct NaiveSurfaceNetsScheduler : IMeshingAlgorithmScheduler

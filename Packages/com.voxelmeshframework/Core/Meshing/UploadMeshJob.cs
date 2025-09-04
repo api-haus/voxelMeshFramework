@@ -40,7 +40,10 @@ namespace Voxels.Core.Meshing
 			md.SetSubMesh(
 				0,
 				new SubMeshDescriptor(0, indices.Length) { bounds = bounds.Item.ToBounds() },
-				DontValidateIndices | DontResetBoneBounds | DontRecalculateBounds | DontValidateLodRanges
+				DontValidateIndices | DontResetBoneBounds | DontRecalculateBounds
+#if UNITY_6000_2_OR_NEWER
+					| DontValidateLodRanges
+#endif
 			);
 
 			md.GetVertexData<Vertex>().CopyFrom(vertices.AsArray());

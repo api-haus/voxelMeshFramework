@@ -36,6 +36,10 @@ namespace Voxels.Core.Procedural
 		[SerializeField]
 		float grassUpDotThreshold = 0.7f;
 
+		[SerializeField]
+		[Range(1, 64)]
+		int sdfSamplesPerVoxel = 16;
+
 		public override JobHandle Schedule(
 			MinMaxAABB localBounds,
 			float4x4 ltw,
@@ -44,6 +48,8 @@ namespace Voxels.Core.Procedural
 			JobHandle inputDeps
 		)
 		{
+			// Linear quantization scale to pack more resolution per voxel into sbyte
+			var sdfScale = (float)sdfSamplesPerVoxel / voxelSize;
 			// 1) Generate hemisphere SDF (inside-positive). Hemisphere is sphere intersected with half-space y >= center.y (Y+ oriented)
 			inputDeps = new SdfJob
 			{
@@ -53,6 +59,7 @@ namespace Voxels.Core.Procedural
 				volumeData = data,
 				centerWorld = center,
 				radius = radius,
+				sdfScale = sdfScale,
 			}.Schedule(VOLUME_LENGTH, inputDeps);
 
 			// 2) Paint materials similar to SimpleNoiseVoxelGenerator
@@ -70,6 +77,7 @@ namespace Voxels.Core.Procedural
 				materialGold = materialGold,
 				materialGrass = materialGrass,
 				grassUpDotThreshold = grassUpDotThreshold,
+				sdfScale = sdfScale,
 			}.Schedule(VOLUME_LENGTH, inputDeps);
 
 			return inputDeps;
@@ -85,6 +93,7 @@ namespace Voxels.Core.Procedural
 			public float4x4 ltw;
 			public float3 centerWorld;
 			public float radius;
+			public float sdfScale;
 
 			public void Execute(int index)
 			{
@@ -104,7 +113,7 @@ namespace Voxels.Core.Procedural
 				var sPlane = centerWorld.y - coord.y; // inside-positive half-space (y <= center.y)
 				var sHemisphere = min(sSphere, sPlane); // intersection for inside-positive SDFs
 
-				var sdfByte = clamp(sHemisphere, -127f, 127f);
+				var sdfByte = clamp(sHemisphere * sdfScale, -127f, 127f);
 				volumeData.sdfVolume[index] = (sbyte)sdfByte;
 			}
 		}
@@ -125,6 +134,7 @@ namespace Voxels.Core.Procedural
 			public byte materialGold;
 			public byte materialGrass;
 			public float grassUpDotThreshold;
+			public float sdfScale;
 
 			public void Execute(int index)
 			{
@@ -138,7 +148,7 @@ namespace Voxels.Core.Procedural
 
 				coord = transform(ltw, coord);
 
-				var s = (float)volumeData.sdfVolume[index];
+				var sWorld = (float)volumeData.sdfVolume[index] / sdfScale;
 
 				// Surface normal approximation for hemisphere vs cap plane
 				var toCenter = coord - centerWorld;
@@ -149,9 +159,9 @@ namespace Voxels.Core.Procedural
 				var normal = sphereSurface ? toCenter / d : new float3(0f, 1f, 0f);
 
 				// Outside (air): pad one-voxel shell with material to support blending
-				if (s < 0f)
+				if (sWorld < 0f)
 				{
-					if (abs(s) <= voxelSize)
+					if (abs(sWorld) <= voxelSize)
 					{
 						var padMat = normal.y > grassUpDotThreshold ? materialGrass : materialGround;
 						volumeData.materials[index] = padMat;

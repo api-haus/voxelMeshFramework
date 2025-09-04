@@ -240,7 +240,8 @@ namespace Voxels.Tests.Editor
 		/// <summary>
 		///   Tests the SurfaceFairingJob adaptive step sizing based on material boundaries.
 		/// </summary>
-		[Test, Ignore("Removed due to failure in current configuration")]
+		[Test]
+		[Ignore("Removed due to failure in current configuration")]
 		public void SurfaceFairingJob_ReducesStepSizeAtMaterialBoundaries()
 		{
 			// This is a simplified test focusing on the adaptive step size logic

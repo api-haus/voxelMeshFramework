@@ -52,10 +52,10 @@ namespace Voxels.Core.Procedural
 						ltw.Value,
 						voxelObject.voxelSize,
 						mesh.volume,
-						VoxelJobFenceRegistry.Get(entity)
+						VoxelJobFenceRegistry.GetFence(entity)
 					);
 
-					VoxelJobFenceRegistry.Update(entity, job);
+					VoxelJobFenceRegistry.UpdateFence(entity, job);
 				}
 
 				ecb.SetComponentEnabled<NeedsProceduralUpdate>(entity, false);

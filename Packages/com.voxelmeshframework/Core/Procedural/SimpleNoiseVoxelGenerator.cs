@@ -39,6 +39,10 @@ namespace Voxels.Core.Procedural
 		[SerializeField]
 		float grassUpDotThreshold = 0.7f;
 
+		[SerializeField]
+		[Range(1, 64)]
+		int sdfSamplesPerVoxel = 16;
+
 		public override JobHandle Schedule(
 			MinMaxAABB localBounds,
 			float4x4 ltw,
@@ -48,6 +52,11 @@ namespace Voxels.Core.Procedural
 		)
 		{
 			using var _ = SimpleNoiseVoxelGenerator_Schedule.Auto();
+
+			// Choose a linear quantization scale to pack more resolution per voxel into sbyte
+			// StoredSdf = clamp((worldDistance * sdfScale), -127..127)
+			// where sdfScale = sdfSamplesPerVoxel / voxelSize
+			var sdfScale = (float)sdfSamplesPerVoxel / voxelSize;
 
 			// 1) Generate SDF
 			inputDeps = new SdfJob
@@ -60,6 +69,7 @@ namespace Voxels.Core.Procedural
 				groundPlaneY = groundPlaneY,
 				groundAmplitude = groundAmplitude,
 				seed = seed,
+				sdfScale = sdfScale,
 			}.Schedule(VOLUME_LENGTH, inputDeps);
 
 			// 2) Paint materials based on SDF and heightfield gradient
@@ -77,12 +87,13 @@ namespace Voxels.Core.Procedural
 				materialGold = materialGold,
 				materialGrass = materialGrass,
 				grassUpDotThreshold = grassUpDotThreshold,
+				sdfScale = sdfScale,
 			}.Schedule(VOLUME_LENGTH, inputDeps);
 
 			return inputDeps;
 		}
 
-		[BurstCompile(FloatPrecision.Medium, FloatMode.Fast)]
+		[BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
 		struct SdfJob : IJobFor
 		{
 			public float voxelSize;
@@ -94,6 +105,7 @@ namespace Voxels.Core.Procedural
 			public float groundPlaneY;
 			public float groundAmplitude;
 			public uint seed;
+			public float sdfScale;
 
 			public void Execute(int index)
 			{
@@ -115,7 +127,8 @@ namespace Voxels.Core.Procedural
 
 				// Signed distance in world units (positive below/inside the surface)
 				var sdfWorld = surfaceHeight - coord.y;
-				var sdfByte = clamp(sdfWorld, -127f, 127f);
+				// Quantize to sbyte with increased resolution per voxel
+				var sdfByte = clamp(sdfWorld * sdfScale, -127f, 127f);
 
 				volumeData.sdfVolume[index] = (sbyte)sdfByte;
 			}
@@ -137,6 +150,7 @@ namespace Voxels.Core.Procedural
 			public byte materialGold;
 			public byte materialGrass;
 			public float grassUpDotThreshold;
+			public float sdfScale;
 
 			public void Execute(int index)
 			{
@@ -149,7 +163,8 @@ namespace Voxels.Core.Procedural
 				var coord = bounds.Min + (localCoord * voxelSize);
 
 				coord = transform(ltw, coord);
-				var s = (float)volumeData.sdfVolume[index];
+				// Convert stored quantized sdf back to world units for threshold decisions
+				var sWorld = (float)volumeData.sdfVolume[index] / sdfScale;
 
 				// Approximate normal from heightfield derivatives for up/grass detection
 				var seed2 = new float2(seed, seed);
@@ -171,9 +186,9 @@ namespace Voxels.Core.Procedural
 				var grad = normalize(float3(-dhdx, 1f, -dhdz));
 
 				// Outside (air): pad one-voxel shell with material to support blending
-				if (s < 0f)
+				if (sWorld < 0f)
 				{
-					if (abs(s) <= voxelSize)
+					if (abs(sWorld) <= voxelSize)
 					{
 						var padMat = grad.y > grassUpDotThreshold ? materialGrass : materialGround;
 						volumeData.materials[index] = padMat;

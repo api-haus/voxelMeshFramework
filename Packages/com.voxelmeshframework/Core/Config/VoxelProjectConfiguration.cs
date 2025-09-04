@@ -1,10 +1,14 @@
 namespace Voxels.Core.Config
 {
 	using Unity.Burst;
+	using UnityEngine;
 
 	public enum MeshSchedulingPolicy : byte
 	{
+		[InspectorName("Debounce updates")]
 		WAIT_AND_DEBOUNCE = 0,
+
+		[InspectorName("Fire&Forget style schedule")]
 		TAIL_AND_PIPELINE = 1,
 	}
 
@@ -17,7 +21,7 @@ namespace Voxels.Core.Config
 	public static class VoxelProjectConfiguration
 	{
 		static readonly SharedStatic<VoxelProjectConfig> s_config =
-			SharedStatic<VoxelProjectConfig>.GetOrCreate<ConfigContext, ConfigKey>();
+			SharedStatic<VoxelProjectConfig>.GetOrCreate<VoxelProjectConfig>();
 
 		public static bool IsCreated => true; // SharedStatic<T> is always available once type is initialized
 
@@ -56,9 +60,5 @@ namespace Voxels.Core.Config
 				fenceRegistryCapacity = settings.fenceRegistryCapacity,
 			};
 		}
-
-		class ConfigKey { }
-
-		class ConfigContext { }
 	}
 }

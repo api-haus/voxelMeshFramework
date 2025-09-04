@@ -1,15 +1,15 @@
 namespace Voxels.Core.Meshing.Systems
 {
 	using System;
-	using Concurrency;
 	using Tags;
 	using Unity.Burst;
 	using Unity.Entities;
 	using Unity.Jobs;
-	using Unity.Logging;
 	using UnityEngine;
+	using static Concurrency.VoxelJobFenceRegistry;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
+	using static VoxelConstants;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 
 	[RequireMatchingQueriesForUpdate]
@@ -40,14 +40,15 @@ namespace Voxels.Core.Meshing.Systems
 			{
 #if !VMF_TAIL_PIPELINE
 				// Avoid scheduling reads while volume modifications are still in-flight
-				if (!VoxelJobFenceRegistry.TryComplete(entity))
+				if (!TryComplete(entity))
 					continue;
 #endif
 
 				ref var nvm = ref nativeVoxelMeshRef.ValueRW;
 
 				if (nvm.meshing.meshData.Length != 0)
-					Log.Warning("mesh data is non zero when remeshing");
+					// Log.Warning("mesh data is non zero when remeshing");
+					continue;
 
 				nvm.meshing.meshData = Mesh.AllocateWritableMeshData(1);
 
@@ -58,12 +59,10 @@ namespace Voxels.Core.Meshing.Systems
 					materials = nvm.volume.materials,
 					voxelSize = nvm.volume.voxelSize,
 					edgeTable = SharedStaticMeshingResources.EdgeTable,
-					chunkSize = VoxelConstants.CHUNK_SIZE,
-					normalsMode =
-						algorithm.enableFairing && algorithm.recomputeNormalsAfterFairing
-							? NormalsMode.NONE
-							: NormalsMode.TRIANGLE_GEOMETRY,
+					chunkSize = CHUNK_SIZE,
+					normalsMode = algorithm.normalsMode,
 					materialDistributionMode = algorithm.materialDistributionMode,
+					copyApronPostMesh = true,
 				};
 
 				var output = new MeshingOutputData
@@ -74,33 +73,15 @@ namespace Voxels.Core.Meshing.Systems
 					bounds = nvm.meshing.bounds,
 				};
 
-				// Schedule appropriate algorithm
-				var pre = VoxelJobFenceRegistry.Get(entity);
-				JobHandle meshingJob;
-				switch (algorithm.algorithm)
-				{
-					case VoxelMeshingAlgorithm.NAIVE_SURFACE_NETS:
-						if (algorithm.enableFairing)
-							meshingJob = new NaiveSurfaceNetsFairingScheduler
-							{
-								cellMargin = algorithm.cellMargin,
-								fairingBuffers = nvm.meshing.fairing,
-								fairingStepSize = algorithm.fairingStepSize,
-								fairingIterations = algorithm.fairingIterations,
-								recomputeNormalsAfterFairing = algorithm.recomputeNormalsAfterFairing,
-							}.Schedule(input, output, pre);
-						else
-							meshingJob = new NaiveSurfaceNetsScheduler().Schedule(input, output, pre);
-						break;
-					case VoxelMeshingAlgorithm.DUAL_CONTOURING:
-						meshingJob = pre;
-						break;
-					case VoxelMeshingAlgorithm.MARCHING_CUBES:
-						meshingJob = pre;
-						break;
-					default:
-						throw new NotImplementedException($"Algorithm {algorithm.algorithm} not implemented");
-				}
+				// Schedule appropriate algorithm via shared static
+				var pre = GetFence(entity);
+				var meshingJob = MeshingScheduling.ScheduleAlgorithm(
+					input,
+					output,
+					algorithm,
+					ref nvm.meshing.fairing,
+					pre
+				);
 
 				// Schedule mesh upload job
 				meshingJob = new UploadMeshJob
@@ -111,7 +92,7 @@ namespace Voxels.Core.Meshing.Systems
 					vertices = nvm.meshing.vertices,
 				}.Schedule(meshingJob);
 
-				VoxelJobFenceRegistry.Update(entity, meshingJob);
+				UpdateFence(entity, meshingJob);
 
 				ecb.SetComponentEnabled<NeedsRemesh>(entity, false);
 				ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(entity, true);

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Defaults from .cursor/mcp.json
-UNITY_DEFAULT="/Volumes/Archive2TB/UNITY/Installs/6000.2.2f1/Unity.app/Contents/MacOS/Unity"
+UNITY_DEFAULT="/Volumes/Archive2TB/UNITY/Installs/6000.0.56f1/Unity.app/Contents/MacOS/Unity"
 PROJECT_DEFAULT="/Volumes/Archive2TB/UNITY/Projects/voxelMeshFramework"
 
 # Allow override via env vars

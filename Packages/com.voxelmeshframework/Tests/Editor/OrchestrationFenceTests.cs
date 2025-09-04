@@ -1,39 +1,26 @@
-using NUnit.Framework;
-using Unity.Entities;
-using Unity.Jobs;
-using UnityEngine;
-using Voxels.Core;
-using Voxels.Core.Concurrency;
-using Voxels.Core.Meshing;
-using Voxels.Core.Meshing.Tags;
-
 namespace Voxels.Tests.Editor
 {
+	using Core.Concurrency;
+	using NUnit.Framework;
+	using Unity.Entities;
+	using Unity.Jobs;
+
 	public class OrchestrationFenceTests
 	{
 		[Test]
 		public void FenceRegistry_StoresTailAndTryComplete()
 		{
-			// Arrange
-			var world = World.DefaultGameObjectInjectionWorld;
-			if (world == null)
-			{
-				world = new World("Test");
-				World.DefaultGameObjectInjectionWorld = world;
-			}
-			Assert.That(world, Is.Not.Null);
-			var em = world.EntityManager;
-			var e = em.CreateEntity(typeof(NativeVoxelMesh));
-
+			// Arrange: initialize registry and use a synthetic entity key
 			VoxelJobFenceRegistry.Initialize();
+			var e = new Entity { Index = 1, Version = 1 };
 
 			// No fence yet
-			Assert.That(VoxelJobFenceRegistry.Tail(e).Equals(default(JobHandle)));
+			Assert.That(VoxelJobFenceRegistry.Tail(e).Equals(default));
 			Assert.That(VoxelJobFenceRegistry.TryComplete(e), Is.True);
 
-			// Set a default tail
+			// Set a default tail and verify completion clears it
 			var h = default(JobHandle);
-			VoxelJobFenceRegistry.Update(e, h);
+			VoxelJobFenceRegistry.UpdateFence(e, h);
 			Assert.That(VoxelJobFenceRegistry.TryComplete(e), Is.True);
 		}
 	}

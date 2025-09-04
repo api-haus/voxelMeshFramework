@@ -1,6 +1,7 @@
 namespace Voxels.Core.Meshing.Systems
 {
 	using Concurrency;
+	using Grids;
 	using Hybrid;
 	using Tags;
 	using Unity.Burst;
@@ -20,7 +21,7 @@ namespace Voxels.Core.Meshing.Systems
 
 			var ecb = SystemAPI.GetSingleton<EndSimST>().CreateCommandBuffer(World.Unmanaged);
 
-			// apply managed mesh
+			// apply managed mesh (per-entity readiness)
 			foreach (
 				var (nativeVoxelMeshRef, entity) in Query<RefRW<NativeVoxelMesh>>()
 					.WithAll<NeedsManagedMeshUpdate>()
@@ -38,6 +39,51 @@ namespace Voxels.Core.Meshing.Systems
 					nvm.ApplyMeshManaged();
 					ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(entity, false);
 				}
+
+			// atomic grid commit: gather grids that raised RollingGridCommitEvent
+			var commitQuery = SystemAPI
+				.QueryBuilder()
+				.WithAll<RollingGridCommitEvent, NativeVoxelGrid>()
+				.Build();
+			using var commitGrids = commitQuery.ToComponentDataArray<NativeVoxelGrid>(Allocator.Temp);
+			if (commitGrids.Length > 0)
+			{
+				// apply for all chunks whose NativeVoxelChunk.gridID matches any committing gridID
+				foreach (
+					var (nativeVoxelMeshRef, chunk, entity) in Query<
+						RefRW<NativeVoxelMesh>,
+						RefRO<NativeVoxelChunk>
+					>()
+						.WithAll<NeedsManagedMeshUpdate>()
+						.WithEntityAccess()
+				)
+					using (ManagedVoxelMeshingSystem_ApplyMesh.Auto())
+					{
+						var gid = chunk.ValueRO.gridID;
+						var match = false;
+						for (var i = 0; i < commitGrids.Length; i++)
+							if (commitGrids[i].gridID == gid)
+							{
+								match = true;
+								break;
+							}
+						if (!match)
+							continue;
+
+						if (!VoxelJobFenceRegistry.TryComplete(entity))
+							continue;
+						ref var nvm = ref nativeVoxelMeshRef.ValueRW;
+						if (nvm.meshing.meshData.Length == 0)
+							continue;
+						nvm.ApplyMeshManaged();
+						ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(entity, false);
+					}
+
+				// disable commit events after processing
+				using var eventEntities = commitQuery.ToEntityArray(Allocator.Temp);
+				for (var i = 0; i < eventEntities.Length; i++)
+					ecb.SetComponentEnabled<RollingGridCommitEvent>(eventEntities[i], false);
+			}
 
 			// attach w/ mesh filter
 			foreach (

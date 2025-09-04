@@ -24,10 +24,10 @@ namespace Voxels.Core.Authoring
 		[SerializeField]
 		internal VoxelMeshingAlgorithm meshingAlgorithm = VoxelMeshingAlgorithm.NAIVE_SURFACE_NETS;
 
-		[Header("Surface Fairing Settings")]
 		[SerializeField]
-		internal bool enableFairing;
+		internal NormalsMode normalsMode = NormalsMode.GRADIENT;
 
+		[Header("Surface Fairing Settings")]
 		[SerializeField]
 		[Range(0, 10)]
 		internal int fairingIterations = 5;

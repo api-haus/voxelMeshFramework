@@ -1,11 +1,11 @@
 namespace Voxels.Core.Grids
 {
 	using Hybrid;
+	using Meshing.Systems;
+	using Meshing.Tags;
 	using Unity.Entities;
 	using Unity.Transforms;
 	using UnityEngine;
-	using Voxels.Core.Meshing.Systems;
-	using Voxels.Core.Meshing.Tags;
 	using static Unity.Entities.SystemAPI;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 

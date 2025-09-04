@@ -46,7 +46,8 @@ namespace Voxels.Tests.Editor
 					localVolumeBounds = bounds,
 					voxelSize = 1f,
 					volumeLTW = float4x4.identity,
-					volumeWtl = float4x4.identity,
+					volumeWTL = float4x4.identity,
+					sdfScale = 32f,
 				};
 
 				job.Schedule().Complete();
@@ -88,7 +89,8 @@ namespace Voxels.Tests.Editor
 					localVolumeBounds = bounds,
 					voxelSize = 1f,
 					volumeLTW = float4x4.identity,
-					volumeWtl = float4x4.identity,
+					volumeWTL = float4x4.identity,
+					sdfScale = 32f,
 				};
 
 				job.Schedule().Complete();
@@ -134,13 +136,14 @@ namespace Voxels.Tests.Editor
 					localVolumeBounds = bounds,
 					voxelSize = 1f,
 					volumeLTW = ltw,
-					volumeWtl = wtl,
+					volumeWTL = wtl,
+					sdfScale = 32f,
 				};
 
 				job.Schedule().Complete();
 
 				var idx = (16 << X_SHIFT) + (16 << Y_SHIFT) + 16;
-				Assert.AreEqual(127, sdf[idx]);
+				Assert.AreEqual(96, sdf[idx]);
 				Assert.AreEqual(9, mat[idx]);
 			}
 			finally

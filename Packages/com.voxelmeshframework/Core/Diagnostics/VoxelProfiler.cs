@@ -66,6 +66,14 @@ namespace Voxels.Core.Diagnostics
 				"Voxels/Stamps/Schedule"
 			);
 
+			public static readonly ProfilerMarker VoxelStampSystem_ApplyStampJob = new(
+				"Voxels/Stamps/ApplyStampJob"
+			);
+
+			public static readonly ProfilerMarker VoxelStampSystem_CopySharedOverlap = new(
+				"Voxels/Stamps/CopySharedOverlap"
+			);
+
 			public static readonly ProfilerMarker VoxelSpatialSystem_Update = new(
 				"Voxels/Spatial/Update"
 			);

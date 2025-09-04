@@ -19,12 +19,12 @@ namespace Voxels.Samples.SampleControllers
 		float radius = 1.5f;
 
 		[SerializeField]
-		[Range(0, 1)]
-		float digStrength = .5f;
+		[Range(1, 127)]
+		int digStrength = 1;
 
 		[SerializeField]
-		[Range(0, 1)]
-		float placeStrength = .5f;
+		[Range(1, 127)]
+		int placeStrength = 1;
 
 		[SerializeField]
 		float maxDistance = 20f;
@@ -34,6 +34,14 @@ namespace Voxels.Samples.SampleControllers
 
 		[SerializeField]
 		byte paintMaterial = 1;
+
+		[SerializeField]
+		Core.Stamps.StampScheduling.StampApplyParams applyParams = new()
+		{
+			sdfScale = 32f,
+			deltaTime = 0f,
+			alphaPerSecond = 20f,
+		};
 
 		readonly RaycastHit[] m_Hits = new RaycastHit[1];
 
@@ -57,6 +65,11 @@ namespace Voxels.Samples.SampleControllers
 
 		void FixedUpdate()
 		{
+			ApplyStamp();
+		}
+
+		void ApplyStamp()
+		{
 			var ray = m_Camera.ViewportPointToRay(Vector3.one * .5f);
 
 			if (Physics.RaycastNonAlloc(ray, m_Hits, maxDistance, layerMask) == 0)
@@ -77,19 +90,17 @@ namespace Voxels.Samples.SampleControllers
 					},
 				},
 				bounds = MinMaxAABB.CreateFromCenterAndExtents(point, radius * 2f),
-				strength = -digStrength,
 				material = paintMaterial,
 			};
 
 			if (m_DigPressed)
 			{
-				stamp.strength = -digStrength;
+				stamp.strength = -digStrength / 127f;
 				VoxelAPI.Stamp(stamp);
 			}
-
-			if (m_PlacePressed)
+			else if (m_PlacePressed)
 			{
-				stamp.strength = placeStrength;
+				stamp.strength = placeStrength / 127f;
 				VoxelAPI.Stamp(stamp);
 			}
 		}

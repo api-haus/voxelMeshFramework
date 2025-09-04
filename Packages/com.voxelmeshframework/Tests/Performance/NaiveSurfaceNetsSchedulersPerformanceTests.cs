@@ -12,13 +12,13 @@ namespace Voxels.Tests.Editor
 	using Unity.PerformanceTesting;
 
 	[TestFixture]
-	public class NaiveSurfaceNetsPerformanceTests
+	public class NaiveSurfaceNetsSchedulersPerformanceTests
 	{
 		[OneTimeSetUp]
 		public void OneTimeSetUp()
 		{
 			if (!SharedStaticMeshingResources.EdgeTable.IsCreated)
-				SharedStaticMeshingResources.Init();
+				SharedStaticMeshingResources.Initialize();
 			m_EdgeTable = SharedStaticMeshingResources.EdgeTable;
 		}
 
@@ -26,52 +26,33 @@ namespace Voxels.Tests.Editor
 
 		[Test]
 		[Performance]
-		public void SurfaceNets_Sphere_GradientNormals()
+		public void Scheduler_NaiveSurfaceNets_Sphere_GradientNormals()
 		{
-			RunSurfaceNetsPerfTest(
+			RunSchedulerPerfTest(
 				CreateSphereSdf(16f, 16f, 16f, 8f),
 				CreateUniformMaterials(1),
-				NormalsMode.GRADIENT
+				NormalsMode.GRADIENT,
+				false
 			);
 		}
 
 		[Test]
 		[Performance]
-		public void SurfaceNets_Sphere_TriangleNormals()
+		public void Scheduler_NaiveSurfaceNetsFairing_Sphere_WithIterations()
 		{
-			RunSurfaceNetsPerfTest(
+			RunSchedulerPerfTest(
 				CreateSphereSdf(16f, 16f, 16f, 8f),
 				CreateUniformMaterials(1),
-				NormalsMode.TRIANGLE_GEOMETRY
+				NormalsMode.GRADIENT,
+				true
 			);
 		}
 
-		[Test]
-		[Performance]
-		public void SurfaceNets_Plane_GradientNormals()
-		{
-			RunSurfaceNetsPerfTest(
-				CreatePlaneSdf(0f, 1f, 0f, 0f),
-				CreateUniformMaterials(1),
-				NormalsMode.GRADIENT
-			);
-		}
-
-		[Test]
-		[Performance]
-		public void SurfaceNets_Plane_TriangleNormals()
-		{
-			RunSurfaceNetsPerfTest(
-				CreatePlaneSdf(0f, 1f, 0f, 0f),
-				CreateUniformMaterials(1),
-				NormalsMode.TRIANGLE_GEOMETRY
-			);
-		}
-
-		void RunSurfaceNetsPerfTest(
+		void RunSchedulerPerfTest(
 			NativeArray<sbyte> volume,
 			NativeArray<byte> materials,
-			NormalsMode normalsMode
+			NormalsMode normalsMode,
+			bool useFairing
 		)
 		{
 			var buffer = new NativeArray<int>(
@@ -84,6 +65,30 @@ namespace Voxels.Tests.Editor
 			var indices = new NativeList<int>(Allocator.TempJob);
 			var bounds = UnsafePointer<MinMaxAABB>.Create();
 
+			var input = new MeshingInputData
+			{
+				volume = volume,
+				materials = materials,
+				edgeTable = m_EdgeTable,
+				voxelSize = 1.0f,
+				chunkSize = VoxelConstants.CHUNK_SIZE,
+				normalsMode = normalsMode,
+				materialDistributionMode = MaterialDistributionMode.BLENDED_CORNER_SUM,
+				copyApronPostMesh = false,
+			};
+
+			var output = new MeshingOutputData
+			{
+				vertices = vertices,
+				indices = indices,
+				buffer = buffer,
+				bounds = bounds,
+			};
+
+			FairingBuffers fairingBuffers = default;
+			if (useFairing)
+				fairingBuffers = new FairingBuffers(Allocator.TempJob);
+
 			try
 			{
 				Measure
@@ -93,20 +98,20 @@ namespace Voxels.Tests.Editor
 						indices.Clear();
 						bounds.Item = new MinMaxAABB(float.PositiveInfinity, float.NegativeInfinity);
 
-						var job = new NaiveSurfaceNets
-						{
-							edgeTable = m_EdgeTable,
-							volume = volume,
-							materials = materials,
-							buffer = buffer,
-							indices = indices,
-							vertices = vertices,
-							bounds = bounds,
-							normalsMode = normalsMode,
-							voxelSize = 1.0f,
-						};
+						JobHandle handle;
+						if (!useFairing)
+							handle = new NaiveSurfaceNetsScheduler().Schedule(input, output, default);
+						else
+							handle = new NaiveSurfaceNetsFairingScheduler
+							{
+								fairingBuffers = fairingBuffers,
+								fairingIterations = 5,
+								fairingStepSize = 0.6f,
+								cellMargin = 0.1f,
+								recomputeNormalsAfterFairing = false,
+							}.Schedule(input, output, default);
 
-						job.Run();
+						handle.Complete();
 
 						Measure.Custom(new SampleGroup("Vertices", SampleUnit.Undefined), vertices.Length);
 						Measure.Custom(new SampleGroup("Triangles", SampleUnit.Undefined), indices.Length / 3f);
@@ -125,6 +130,8 @@ namespace Voxels.Tests.Editor
 				vertices.Dispose();
 				indices.Dispose();
 				bounds.Dispose();
+				if (useFairing)
+					fairingBuffers.Dispose();
 			}
 		}
 
@@ -138,27 +145,6 @@ namespace Voxels.Tests.Editor
 			{
 				var pos = new float3(x, y, z);
 				var distance = math.length(pos - center) - radius;
-				distance = math.clamp(distance, -127, 127);
-				var index =
-					(x * VoxelConstants.CHUNK_SIZE * VoxelConstants.CHUNK_SIZE)
-					+ (y * VoxelConstants.CHUNK_SIZE)
-					+ z;
-				volume[index] = (sbyte)distance;
-			}
-
-			return volume;
-		}
-
-		static NativeArray<sbyte> CreatePlaneSdf(float nx, float ny, float nz, float d)
-		{
-			var n = math.normalize(new float3(nx, ny, nz));
-			var volume = new NativeArray<sbyte>(VoxelConstants.VOLUME_LENGTH, Allocator.TempJob);
-			for (var x = 0; x < VoxelConstants.CHUNK_SIZE; x++)
-			for (var y = 0; y < VoxelConstants.CHUNK_SIZE; y++)
-			for (var z = 0; z < VoxelConstants.CHUNK_SIZE; z++)
-			{
-				var pos = new float3(x, y, z);
-				var distance = math.dot(n, pos) + d;
 				distance = math.clamp(distance, -127, 127);
 				var index =
 					(x * VoxelConstants.CHUNK_SIZE * VoxelConstants.CHUNK_SIZE)

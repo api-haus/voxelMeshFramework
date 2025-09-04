@@ -105,7 +105,7 @@ namespace Voxels.Core
 				new VoxelMeshingAlgorithmComponent
 				{
 					algorithm = vm.meshingAlgorithm,
-					enableFairing = vm.enableFairing,
+					normalsMode = vm.normalsMode,
 					fairingIterations = vm.fairingIterations,
 					fairingStepSize = vm.fairingStepSize,
 					cellMargin = vm.cellMargin,
@@ -220,7 +220,7 @@ namespace Voxels.Core
 				new VoxelMeshingAlgorithmComponent
 				{
 					algorithm = vm.meshingAlgorithm,
-					enableFairing = vm.enableFairing,
+					normalsMode = vm.normalsMode,
 					fairingIterations = vm.fairingIterations,
 					fairingStepSize = vm.fairingStepSize,
 					cellMargin = vm.cellMargin,

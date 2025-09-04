@@ -16,7 +16,10 @@ namespace Voxels.Core.Meshing
 			Mesh.ApplyAndDisposeWritableMeshData(
 				nvm.meshing.meshData,
 				nvm.meshing.meshRef,
-				DontValidateIndices | DontResetBoneBounds | DontRecalculateBounds | DontValidateLodRanges
+				DontValidateIndices | DontResetBoneBounds | DontRecalculateBounds
+#if UNITY_6000_2_OR_NEWER
+					| DontValidateLodRanges
+#endif
 			);
 			nvm.meshing.meshData = default;
 

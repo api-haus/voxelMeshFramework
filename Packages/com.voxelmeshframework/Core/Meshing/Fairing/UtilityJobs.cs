@@ -7,7 +7,7 @@ namespace Voxels.Core.Meshing.Fairing
 	using Unity.Mathematics;
 
 	/// <summary>
-	/// Extracts position and material data from vertices for fairing processing.
+	///   Extracts position and material data from vertices for fairing processing.
 	/// </summary>
 	[BurstCompile(
 		Debug = false,
@@ -61,7 +61,7 @@ namespace Voxels.Core.Meshing.Fairing
 	}
 
 	/// <summary>
-	/// Copies positions from one array to another.
+	///   Copies positions from one array to another.
 	/// </summary>
 	[BurstCompile(
 		Debug = false,
@@ -82,7 +82,7 @@ namespace Voxels.Core.Meshing.Fairing
 		public NativeArray<float3> destination;
 
 		/// <summary>
-		/// Number of positions to copy.
+		///   Number of positions to copy.
 		/// </summary>
 		[ReadOnly]
 		public int vertexCount;
@@ -90,14 +90,12 @@ namespace Voxels.Core.Meshing.Fairing
 		public void Execute()
 		{
 			for (var index = 0; index < vertexCount; index++)
-			{
 				destination[index] = source[index];
-			}
 		}
 	}
 
 	/// <summary>
-	/// Updates vertex positions with new fairing results.
+	///   Updates vertex positions with new fairing results.
 	/// </summary>
 	[BurstCompile(
 		Debug = false,
@@ -129,7 +127,7 @@ namespace Voxels.Core.Meshing.Fairing
 	}
 
 	/// <summary>
-	/// Updates vertex normals with recalculated values.
+	///   Updates vertex normals with recalculated values.
 	/// </summary>
 	[BurstCompile(
 		Debug = false,
@@ -161,7 +159,7 @@ namespace Voxels.Core.Meshing.Fairing
 	}
 
 	/// <summary>
-	/// Clears normals array to zero before accumulation.
+	///   Clears normals array to zero before accumulation.
 	/// </summary>
 	[BurstCompile(
 		Debug = false,
@@ -177,7 +175,7 @@ namespace Voxels.Core.Meshing.Fairing
 		public NativeList<float3> normals;
 
 		/// <summary>
-		/// Input vertices to get count from.
+		///   Input vertices to get count from.
 		/// </summary>
 		[NoAlias]
 		[ReadOnly]
@@ -190,9 +188,7 @@ namespace Voxels.Core.Meshing.Fairing
 			// ===== RESIZE AND CLEAR NORMALS =====
 			normals.ResizeUninitialized(vertexCount);
 			for (var index = 0; index < vertexCount; index++)
-			{
 				normals[index] = new float3(0, 0, 0);
-			}
 		}
 	}
 }

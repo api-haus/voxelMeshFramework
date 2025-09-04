@@ -43,12 +43,7 @@ namespace Voxels.Editor
 				m_SettingsAsset.meshSchedulingPolicy == MeshSchedulingPolicy.TAIL_AND_PIPELINE;
 			EditorApplication.delayCall += () =>
 			{
-				if (
-					ScriptingDefineUtility.IsDefineEnabledForActiveTarget(
-						ScriptingDefineUtility.VMF_TAIL_PIPELINE
-					) != desiredTail
-				)
-					ScriptingDefineUtility.SetTailPipelineDefineEnabled(desiredTail);
+				ScriptingDefineUtility.SetTailPipelineDefineEnabled(desiredTail);
 			};
 		}
 

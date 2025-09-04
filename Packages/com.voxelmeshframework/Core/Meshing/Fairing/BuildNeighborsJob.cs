@@ -93,6 +93,12 @@ namespace Voxels.Core.Meshing.Fairing
 						// Ensure neighbor cell is within valid chunk bounds.
 						if (all(neighborCell >= 0) && all(neighborCell < CHUNK_SIZE))
 						{
+							// ===== SEAM SLAB RESTRICTION =====
+							// If the source cell lies within any overlap slab along an axis,
+							// restrict neighbors to remain within the same slab for those axes.
+							if (!SeamUtils.NeighborRespectsSeamSlab(cellCoord, neighborCell))
+								continue;
+
 							// ===== CELL-TO-VERTEX LOOKUP =====
 							// Convert 3D neighbor coordinates to linear index and look up vertex.
 							var neighborLinearIndex =
