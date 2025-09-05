@@ -57,12 +57,41 @@ namespace Voxels.Core.Authoring
 		internal MaterialDistributionMode materialDistributionMode =
 			MaterialDistributionMode.BLENDED_CORNER_SUM;
 
+		[Header("Rolling Grid")]
+		[SerializeField]
+		internal bool rolling;
+
+		[SerializeField]
+		internal bool externalDriver;
+
+		// test hooks
+		internal void __SetRolling(bool value) => rolling = value;
+
+		internal void __SetExternalDriver(bool value) => externalDriver = value;
+
+		internal void __SetVoxelSize(float value) => voxelSize = value;
+
+		internal void __SetWorldBounds(Bounds b) => worldBounds = b;
+
+		internal void __SetProcedural(ProceduralVoxelGeneratorBehaviour p) => procedural = p;
+
+		[SerializeField]
+		internal Transform anchor;
+
 		void Awake()
 		{
 			this.CreateVoxelMeshGridEntity(
 				gameObject.GetInstanceID(),
-				transformAttachment ? transform : null
+				(transformAttachment || rolling) ? transform : null
 			);
+
+			if (!anchor)
+				anchor = transform;
+
+			if (rolling)
+			{
+				ConfigureRollingGrid();
+			}
 		}
 
 		void OnDestroy()
@@ -100,6 +129,33 @@ namespace Voxels.Core.Authoring
 				var center = (c + (float3)0.5f) * chunkSize;
 				Gizmos.DrawWireCube((float3)worldBounds.min + center, (float3)chunkSize);
 			}
+		}
+
+		void Update()
+		{
+			if (!rolling)
+				return;
+			// When driven by an external driver (e.g. RollingGridPlayerDriver), don't emit our own move requests
+			if (externalDriver)
+				return;
+			if (!VoxelEntityBridge.TryGetEntityManager(out var em))
+				return;
+			var gid = gameObject.GetInstanceID();
+			var origin = anchor ? anchor.position : transform.position;
+			var chunkWorld = new Unity.Mathematics.int3(
+				(int)math.floor(origin.x / (voxelSize * VoxelConstants.EFFECTIVE_CHUNK_SIZE)),
+				(int)math.floor(origin.y / (voxelSize * VoxelConstants.EFFECTIVE_CHUNK_SIZE)),
+				(int)math.floor(origin.z / (voxelSize * VoxelConstants.EFFECTIVE_CHUNK_SIZE))
+			);
+			VoxelEntityBridge.SendRollingMovementRequest(gid, chunkWorld);
+		}
+
+		void ConfigureRollingGrid()
+		{
+			if (!VoxelEntityBridge.TryGetEntityManager(out var em))
+				return;
+			var gid = gameObject.GetInstanceID();
+			VoxelEntityBridge.EnableRollingForGrid(gid);
 		}
 	}
 }

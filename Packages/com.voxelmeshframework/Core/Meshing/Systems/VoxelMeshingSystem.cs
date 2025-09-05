@@ -1,6 +1,7 @@
 namespace Voxels.Core.Meshing.Systems
 {
 	using System;
+	using Grids;
 	using Tags;
 	using Unity.Burst;
 	using Unity.Entities;
@@ -93,6 +94,34 @@ namespace Voxels.Core.Meshing.Systems
 				}.Schedule(meshingJob);
 
 				UpdateFence(entity, meshingJob);
+
+				// mark first-time processed for per-grid progress
+				if (!state.EntityManager.HasComponent<ProcessedOnce>(entity))
+				{
+					ecb.AddComponent<ProcessedOnce>(entity);
+					ecb.SetComponentEnabled<ProcessedOnce>(entity, true);
+					if (state.EntityManager.HasComponent<NativeVoxelChunk>(entity))
+					{
+						var gid = state.EntityManager.GetComponentData<NativeVoxelChunk>(entity).gridID;
+						var gq = QueryBuilder().WithAll<NativeVoxelGrid>().Build();
+						using var grids = gq.ToEntityArray(Unity.Collections.Allocator.Temp);
+						using var gridDatas = gq.ToComponentDataArray<NativeVoxelGrid>(
+							Unity.Collections.Allocator.Temp
+						);
+						for (var i = 0; i < grids.Length; i++)
+						{
+							if (gridDatas[i].gridID != gid)
+								continue;
+							var grid = grids[i];
+							var prog = state.EntityManager.HasComponent<GridMeshingProgress>(grid)
+								? state.EntityManager.GetComponentData<GridMeshingProgress>(grid)
+								: default;
+							prog.processedCount++;
+							ecb.SetComponent(grid, prog);
+							break;
+						}
+					}
+				}
 
 				ecb.SetComponentEnabled<NeedsRemesh>(entity, false);
 				ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(entity, true);

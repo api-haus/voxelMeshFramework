@@ -5,7 +5,7 @@ namespace Voxels.Core.Concurrency
 	using Unity.Entities;
 	using Unity.Jobs;
 
-	static class VoxelJobFenceRegistry
+	public static class VoxelJobFenceRegistry
 	{
 		static readonly SharedStatic<NativeParallelHashMap<Entity, JobHandle>> s_fences = SharedStatic<
 			NativeParallelHashMap<Entity, JobHandle>

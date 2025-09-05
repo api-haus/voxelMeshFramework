@@ -40,6 +40,21 @@ namespace Voxels.Core.Stamps
 			var ecb = GetSingleton<EndSimST>().CreateCommandBuffer(state.WorldUnmanaged);
 			var sh = GetSingleton<VoxelSpatialSystem.VoxelObjectHash>();
 
+			// Precompute grid dims for rolling grids to enforce interior-only edits
+			var gridQuery = QueryBuilder().WithAll<NativeVoxelGrid, Grids.RollingGridConfig>().Build();
+			using var gridGrids = gridQuery.ToComponentDataArray<NativeVoxelGrid>(Allocator.Temp);
+			using var gridCfgs = gridQuery.ToComponentDataArray<Grids.RollingGridConfig>(Allocator.Temp);
+			var gridIdToDims = new NativeParallelHashMap<int, Unity.Mathematics.int3>(
+				gridGrids.Length,
+				Allocator.Temp
+			);
+			for (var i = 0; i < gridGrids.Length; i++)
+			{
+				if (!gridCfgs[i].enabled)
+					continue;
+				gridIdToDims.TryAdd(gridGrids[i].gridID, gridCfgs[i].slotDims);
+			}
+
 			using var stamps = m_StampQuery.ToComponentDataArray<NativeVoxelStampProcedural>(
 				Allocator.TempJob
 			);
@@ -64,10 +79,30 @@ namespace Voxels.Core.Stamps
 					var nvmRw = GetComponentRW<NativeVoxelMesh>(spatialVoxelObject.entity);
 					ref var nvm = ref nvmRw.ValueRW;
 
+					// Enforce interior-only edits when rolling is enabled for the grid
+					if (HasComponent<Grids.NativeVoxelChunk>(spatialVoxelObject.entity))
+					{
+						var chunk = GetComponent<Grids.NativeVoxelChunk>(spatialVoxelObject.entity);
+						if (gridIdToDims.TryGetValue(chunk.gridID, out var dims))
+						{
+							var c = chunk.coord;
+							// editable window [2 .. dims-3] per axis
+							if (
+								c.x < 2
+								|| c.y < 2
+								|| c.z < 2
+								|| c.x > dims.x - 3
+								|| c.y > dims.y - 3
+								|| c.z > dims.z - 3
+							)
+								continue;
+						}
+					}
+
 					using (VoxelStampSystem_Schedule.Auto())
 					{
-						// Avoid scheduling writes while previous work for this entity is still in-flight
 #if !VMF_TAIL_PIPELINE
+						// Avoid scheduling writes while previous work for this entity is still in-flight
 						if (!TryComplete(spatialVoxelObject.entity))
 							continue;
 #endif

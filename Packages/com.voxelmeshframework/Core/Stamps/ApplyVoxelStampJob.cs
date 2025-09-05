@@ -13,7 +13,7 @@ namespace Voxels.Core.Stamps
 
 	//sphere only
 	[BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
-	struct ApplyVoxelStampJob : IJob
+	public struct ApplyVoxelStampJob : IJob
 	{
 		[NativeDisableContainerSafetyRestriction]
 		public NativeArray<sbyte> volumeSdf;

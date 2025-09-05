@@ -67,8 +67,15 @@ namespace Voxels.Core.Grids
 				ref readonly var ltw = ref ltwRef.ValueRO;
 
 				var voxelSize = grid.voxelSize;
+				int3 gridDims;
 				var size = grid.bounds.Max - grid.bounds.Min;
-				var gridDims = (int3)ceil(size / (voxelSize * chunkStride));
+				gridDims = (int3)ceil(size / (voxelSize * chunkStride));
+				if (state.EntityManager.HasComponent<RollingGridConfig>(entity))
+				{
+					var cfg = state.EntityManager.GetComponentData<RollingGridConfig>(entity);
+					if (cfg.enabled)
+						gridDims = cfg.slotDims;
+				}
 				gridDims = min(gridDims, new int3(64));
 
 				// ensure LinkedEntityGroup exists and contains root (created in bridge)
@@ -125,10 +132,14 @@ namespace Voxels.Core.Grids
 					ecb.SetComponentEnabled<NeedsSpatialUpdate>(chunk, true);
 
 					// inherit grid Needs*
-					ecb.SetComponentEnabled<NeedsRemesh>(chunk, IsComponentEnabled<NeedsRemesh>(entity));
+					ecb.SetComponentEnabled<NeedsRemesh>(
+						chunk,
+						HasComponent<NeedsRemesh>(entity) && IsComponentEnabled<NeedsRemesh>(entity)
+					);
 					ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(
 						chunk,
-						IsComponentEnabled<NeedsManagedMeshUpdate>(entity)
+						HasComponent<NeedsManagedMeshUpdate>(entity)
+							&& IsComponentEnabled<NeedsManagedMeshUpdate>(entity)
 					);
 					if (HasComponent<NeedsProceduralUpdate>(entity))
 						ecb.SetComponentEnabled<NeedsProceduralUpdate>(
@@ -148,6 +159,19 @@ namespace Voxels.Core.Grids
 
 					// link under grid for lifetime management
 					ecb.AppendToBuffer(entity, new LinkedEntityGroup { Value = chunk });
+				}
+
+				// set grid progress totals on first allocation
+				{
+					var total = gridDims.x * gridDims.y * gridDims.z;
+					if (!state.EntityManager.HasComponent<GridMeshingProgress>(entity))
+						ecb.AddComponent<GridMeshingProgress>(entity);
+					var prog = state.EntityManager.HasComponent<GridMeshingProgress>(entity)
+						? state.EntityManager.GetComponentData<GridMeshingProgress>(entity)
+						: default;
+					prog.totalChunks = total;
+					prog.allocatedChunks = total;
+					ecb.SetComponent(entity, prog);
 				}
 
 				ecb.SetComponentEnabled<NeedsChunkAllocation>(entity, false);

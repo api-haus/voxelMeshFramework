@@ -19,7 +19,7 @@ namespace Voxels.Core.Meshing
 			ref s_sharedStatic.Data.vertexAttributes;
 
 		[RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-		internal static void Initialize()
+		public static void Initialize()
 		{
 			using var _ = SharedStaticMeshingResources_Initialize.Auto();
 

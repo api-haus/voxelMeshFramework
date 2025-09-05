@@ -1,0 +1,29 @@
+{
+	"name": "Voxels.Runtime.Tests",
+	"rootNamespace": "Voxels",
+	"references": [
+		"Voxels.Core",
+		"Voxels.Runtime",
+		"Unity.Entities",
+		"Unity.Transforms",
+		"Unity.Mathematics",
+		"Unity.Collections"
+	],
+	"optionalUnityReferences": [
+		"TestAssemblies"
+	],
+	"includePlatforms": [],
+	"excludePlatforms": [],
+	"allowUnsafeCode": false,
+	"overrideReferences": false,
+	"precompiledReferences": [
+		"nunit.framework.dll"
+	],
+	"autoReferenced": true,
+	"defineConstraints": [
+		"UNITY_INCLUDE_TESTS"
+	],
+	"noEngineReferences": false
+}
+
+

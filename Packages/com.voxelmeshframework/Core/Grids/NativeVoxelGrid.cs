@@ -10,5 +10,12 @@ namespace Voxels.Core.Grids
 		public float voxelSize;
 
 		public MinMaxAABB bounds;
+
+		public struct MeshingBudget : IComponentData
+		{
+			public int maxMeshesPerFrame;
+		}
+
+		public struct FullyMeshedEvent : IComponentData, IEnableableComponent { }
 	}
 }

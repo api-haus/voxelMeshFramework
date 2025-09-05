@@ -31,9 +31,13 @@ namespace Voxels.Core.Grids
 					.WithEntityAccess()
 			)
 			{
-				var remesh = IsComponentEnabled<NeedsRemesh>(entity);
-				var spatial = IsComponentEnabled<NeedsSpatialUpdate>(entity);
-				var procedural = IsComponentEnabled<NeedsProceduralUpdate>(entity);
+				var remesh = HasComponent<NeedsRemesh>(entity) && IsComponentEnabled<NeedsRemesh>(entity);
+				var spatial =
+					HasComponent<NeedsSpatialUpdate>(entity)
+					&& IsComponentEnabled<NeedsSpatialUpdate>(entity);
+				var procedural =
+					HasComponent<NeedsProceduralUpdate>(entity)
+					&& IsComponentEnabled<NeedsProceduralUpdate>(entity);
 
 				if (!remesh && !procedural && !spatial)
 					continue;
@@ -41,20 +45,22 @@ namespace Voxels.Core.Grids
 				for (var i = 1; i < leg.Length; i++)
 				{
 					var child = leg[i].Value;
-					if (remesh)
+
+					// Only set components that exist on the child entity
+					if (remesh && HasComponent<NeedsRemesh>(child))
 						ecb.SetComponentEnabled<NeedsRemesh>(child, true);
-					if (spatial)
+					if (spatial && HasComponent<NeedsSpatialUpdate>(child))
 						ecb.SetComponentEnabled<NeedsSpatialUpdate>(child, true);
-					if (procedural)
+					if (procedural && HasComponent<NeedsProceduralUpdate>(child))
 						ecb.SetComponentEnabled<NeedsProceduralUpdate>(child, true);
 				}
 
-				// Turn off from greed - we propagated.
-				if (remesh)
+				// Turn off from grid - we propagated.
+				if (remesh && HasComponent<NeedsRemesh>(entity))
 					ecb.SetComponentEnabled<NeedsRemesh>(entity, false);
-				if (spatial)
+				if (spatial && HasComponent<NeedsSpatialUpdate>(entity))
 					ecb.SetComponentEnabled<NeedsSpatialUpdate>(entity, false);
-				if (procedural)
+				if (procedural && HasComponent<NeedsProceduralUpdate>(entity))
 					ecb.SetComponentEnabled<NeedsProceduralUpdate>(entity, false);
 			}
 		}

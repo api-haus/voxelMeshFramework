@@ -133,6 +133,10 @@ namespace Voxels.Core.Diagnostics
 			public static readonly ProfilerMarker VoxelEntityBridge_CreateGridEntity = new(
 				"Voxels/Bridge/CreateGridEntity"
 			);
+
+			public static readonly ProfilerMarker RollingGridOrchestratorSystem_Update = new(
+				"Voxels/RollingGridOrchestratorSystem/Update"
+			);
 		}
 	}
 }
