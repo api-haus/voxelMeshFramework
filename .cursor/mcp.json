@@ -6,7 +6,7 @@
 				"-y",
 				"@pala-tech/unity-batchmode-mcp",
 				"--unity-editor",
-				"/Volumes/Archive2TB/UNITY/Installs/6000.0.56f1/Unity.app/Contents/MacOS/Unity",
+				"/Volumes/Archive2TB/UNITY/Installs/6000.2.2f1/Unity.app/Contents/MacOS/Unity",
 				"--projectPath",
 				"/Volumes/Archive2TB/UNITY/Projects/voxelMeshFramework"
 			]
