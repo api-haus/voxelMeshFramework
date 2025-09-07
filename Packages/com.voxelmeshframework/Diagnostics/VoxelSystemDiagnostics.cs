@@ -47,7 +47,6 @@ namespace Voxels.Diagnostics
 			// Check for critical voxel systems
 			CheckForSystem<Voxels.Core.Config.VoxelProjectBootstrapSystem>(world, sb);
 			CheckForSystem<Voxels.Core.Concurrency.VoxelJobFenceRegistrySystem>(world, sb);
-			CheckForSystem<Voxels.Core.Meshing.Systems.RollingGridOrchestratorSystem>(world, sb);
 			CheckForManagedSystem<Voxels.Core.Meshing.Systems.ManagedVoxelMeshingSystem>(world, sb);
 			CheckForManagedSystem<Voxels.Core.Hybrid.EntityGameObjectTransformSystem>(world, sb);
 			CheckForSystem<Voxels.Core.Grids.GridChunkAllocationSystem>(world, sb);

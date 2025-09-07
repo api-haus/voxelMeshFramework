@@ -100,27 +100,28 @@ namespace Voxels.Core.Stamps
 				// Strength mapping: logarithmic response for fine control at low strengths + time scaling
 				var strengthAbs = abs(stamp.strength);
 				var s = clamp(strengthAbs, 0f, 1f);
+
 				// alpha_base in [0,1]: 0->0, 1->1; k controls curve steepness (higher k => more sensitivity near 0)
-				const float k = 5f;
-				var alphaBase = select(0f, log((k * s) + 1f) / log(k + 1f), s > 0f);
+				var alphaBase = select(0f, s, s > 0f);
+
 				// convert per-second rate to per-step factor: alphaTime = 1 - exp(-rate * dt)
 				var alphaTime = 1f - exp(-max(0f, alphaPerSecond) * max(0f, deltaTime));
-				var alpha = s >= 1f ? 1f : alphaBase * weight * alphaTime;
+				// var alphaTime = 1;
+				var alpha = alphaBase * weight * alphaTime;
 
 				var worldNew = lerp(world, targetWorld, alpha);
-				var storedNew = clamp(round(worldNew * sdfScale), -127f, 127f);
+				var storedNew = (sbyte)clamp(round(worldNew * sdfScale), -127f, 127f);
 
-				// Ensure minimal effect: if quantization swallows the change, nudge by one LSB toward target
-				if (alpha > 0f && storedNew == stored && targetWorld != world)
-				{
-					var dir = sign(targetWorld - world);
-					storedNew = clamp(stored + select(-1f, 1f, dir > 0f), -127f, 127f);
-				}
+				var isChanged = storedNew != volumeSdf[ptr];
 
-				volumeSdf[ptr] = (sbyte)storedNew;
+				volumeSdf[ptr] = storedNew;
 				volumeMaterials[ptr] = (byte)select(
 					MATERIAL_AIR,
-					select(volumeMaterials[ptr], (int)stamp.material, stamp.strength >= 0),
+					select(
+						volumeMaterials[ptr],
+						select(volumeMaterials[ptr], (int)stamp.material, isChanged),
+						stamp.strength >= 0
+					),
 					volumeSdf[ptr] >= 0
 				);
 			}

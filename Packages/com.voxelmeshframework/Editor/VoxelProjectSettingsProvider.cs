@@ -1,6 +1,8 @@
 namespace Voxels.Editor
 {
+	using System;
 	using System.Collections.Generic;
+	using System.IO;
 	using Core.Config;
 	using UnityEditor;
 	using UnityEngine;
@@ -39,12 +41,10 @@ namespace Voxels.Editor
 				m_SerializedSettings = new SerializedObject(m_SettingsAsset);
 
 			// Ensure scripting define reflects current settings on activation (deferred)
-			var desiredTail =
-				m_SettingsAsset.meshSchedulingPolicy == MeshSchedulingPolicy.TAIL_AND_PIPELINE;
-			EditorApplication.delayCall += () =>
-			{
-				ScriptingDefineUtility.SetTailPipelineDefineEnabled(desiredTail);
-			};
+			// EditorApplication.delayCall += () =>
+			// {
+			// 	ScriptingDefineUtility.SetTailPipelineDefineEnabled(desiredTail);
+			// };
 		}
 
 		public override void OnGUI(string searchContext)
@@ -65,44 +65,48 @@ namespace Voxels.Editor
 			}
 
 			m_SerializedSettings.Update();
-			var policyProp = m_SerializedSettings.FindProperty("meshSchedulingPolicy");
-			EditorGUILayout.PropertyField(policyProp, new GUIContent("Mesh Scheduling Policy"));
-			EditorGUILayout.HelpBox(
-				"Please note that changing this setting will trigger a recompilation of the project.",
-				MessageType.None
-			);
+			// var policyProp = m_SerializedSettings.FindProperty("meshSchedulingPolicy");
+			// EditorGUILayout.PropertyField(policyProp, new GUIContent("Mesh Scheduling Policy"));
+			// EditorGUILayout.HelpBox(
+			// 	"Please note that changing this setting will trigger a recompilation of the project.",
+			// 	MessageType.None
+			// );
 
+			EditorGUILayout.PropertyField(
+				m_SerializedSettings.FindProperty(nameof(VoxelProjectSettings.logLevelInGame)),
+				new GUIContent("Log Level in Build")
+			);
+			EditorGUILayout.PropertyField(
+				m_SerializedSettings.FindProperty(nameof(VoxelProjectSettings.logLevelInEditor)),
+				new GUIContent("Log Level in Editor")
+			);
 			EditorGUILayout.Space();
 			EditorGUILayout.PropertyField(
-				m_SerializedSettings.FindProperty("fenceRegistryCapacity"),
+				m_SerializedSettings.FindProperty(nameof(VoxelProjectSettings.fenceRegistryCapacity)),
 				new GUIContent("Fence Registry Capacity")
 			);
-			if (m_SerializedSettings.ApplyModifiedProperties())
-			{
-				// Apply scripting define based on selected policy (deferred)
-				var enumVal = (MeshSchedulingPolicy)policyProp.enumValueIndex;
-				var desiredTail = enumVal == MeshSchedulingPolicy.TAIL_AND_PIPELINE;
-				EditorApplication.delayCall += () =>
-				{
-					if (
-						ScriptingDefineUtility.IsDefineEnabledForActiveTarget(
-							ScriptingDefineUtility.VMF_TAIL_PIPELINE
-						) != desiredTail
-					)
-						ScriptingDefineUtility.SetTailPipelineDefineEnabled(desiredTail);
-				};
-			}
 
-			EditorGUILayout.Space();
-			EditorGUILayout.HelpBox(
-				"Most configuration remains per object/volume; use these as global defaults.",
-				MessageType.None
-			);
+			m_SerializedSettings.ApplyModifiedProperties();
+			// if (m_SerializedSettings.ApplyModifiedProperties())
+			// {
+			// 	// Apply scripting define based on selected policy (deferred)
+			// 	var enumVal = (MeshSchedulingPolicy)policyProp.enumValueIndex;
+			// 	var desiredTail = enumVal == MeshSchedulingPolicy.TAIL_AND_PIPELINE;
+			// 	EditorApplication.delayCall += () =>
+			// 	{
+			// 		ScriptingDefineUtility.SetTailPipelineDefineEnabled(desiredTail);
+			// 	};
+			// }
 		}
 
 		static VoxelProjectSettings FindOrCreateSettingsAsset(bool createIfMissing, bool ping = false)
 		{
-			var path = "Assets/VoxelProjectSettings.asset";
+			const string path = "Assets/Settings/Resources/VoxelProjectSettings.asset";
+			if (!Directory.Exists(Path.GetDirectoryName(path)))
+				Directory.CreateDirectory(
+					Path.GetDirectoryName(path) ?? throw new InvalidOperationException()
+				);
+
 			var settings = AssetDatabase.LoadAssetAtPath<VoxelProjectSettings>(path);
 			if (settings == null && createIfMissing)
 			{

@@ -1,6 +1,6 @@
 namespace Voxels.Performance.Tests
 {
-	using Core.Meshing;
+	using Core.Atlasing.ChunkOverlaps;
 	using NUnit.Framework;
 	using Unity.Collections;
 	using Unity.Jobs;

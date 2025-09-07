@@ -1,5 +1,3 @@
-Assets/*
-!Assets/Shaders
 Packages/com.jbooth*
 !Packages/com.jbooth.microsplat.core*
 ProjectSettings/

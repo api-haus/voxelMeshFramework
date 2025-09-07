@@ -2,7 +2,7 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 {
 	using System;
 	using Intrinsics;
-	using Meshing;
+	using Meshing.Algorithms;
 	using Unity.Burst;
 	using Unity.Burst.CompilerServices;
 	using Unity.Collections;
@@ -60,7 +60,7 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 		[ReadOnly]
 		public NativeArray<ushort> edgeTable;
 
-		public MaterialDistributionMode materialDistributionMode;
+		public MaterialEncoding materialEncoding;
 
 		/// <summary>
 		///   3D volume data representing signed distance field values.

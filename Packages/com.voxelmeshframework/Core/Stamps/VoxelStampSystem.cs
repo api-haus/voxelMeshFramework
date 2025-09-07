@@ -1,23 +1,25 @@
 namespace Voxels.Core.Stamps
 {
+	using Atlasing.Components;
 	using Authoring;
 	using Debugging;
-	using Grids;
-	using Meshing;
-	using Meshing.Systems;
+	using Meshing.Components;
 	using Meshing.Tags;
+	using Spatial;
 	using Unity.Burst;
 	using Unity.Collections;
 	using Unity.Entities;
 	using Unity.Jobs;
+	using Unity.Mathematics;
 	using UnityEngine;
 	using static Concurrency.VoxelJobFenceRegistry;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
+	using VoxelMeshingSystem = Meshing.Scheduling.VoxelMeshingSystem;
 	using VoxelSpatialSystem = Spatial.VoxelSpatialSystem;
 
-	[UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
+	// [UpdateInGroup(typeof(FixedStepSimulationSystemGroup))]
 	[UpdateBefore(typeof(VoxelMeshingSystem))]
 	public partial struct VoxelStampSystem : ISystem
 	{
@@ -40,147 +42,180 @@ namespace Voxels.Core.Stamps
 			var ecb = GetSingleton<EndSimST>().CreateCommandBuffer(state.WorldUnmanaged);
 			var sh = GetSingleton<VoxelSpatialSystem.VoxelObjectHash>();
 
-			// Precompute grid dims for rolling grids to enforce interior-only edits
-			var gridQuery = QueryBuilder().WithAll<NativeVoxelGrid, Grids.RollingGridConfig>().Build();
-			using var gridGrids = gridQuery.ToComponentDataArray<NativeVoxelGrid>(Allocator.Temp);
-			using var gridCfgs = gridQuery.ToComponentDataArray<Grids.RollingGridConfig>(Allocator.Temp);
-			var gridIdToDims = new NativeParallelHashMap<int, Unity.Mathematics.int3>(
-				gridGrids.Length,
-				Allocator.Temp
-			);
-			for (var i = 0; i < gridGrids.Length; i++)
-			{
-				if (!gridCfgs[i].enabled)
-					continue;
-				gridIdToDims.TryAdd(gridGrids[i].gridID, gridCfgs[i].slotDims);
-			}
+			var gridIdToDims = default(NativeParallelHashMap<int, int3>);
+			ProcessAllStamps(ref ecb, ref sh, ref gridIdToDims, ref state);
 
+			JobHandle.ScheduleBatchedJobs();
+			ecb.DestroyEntity(m_StampQuery, EntityQueryCaptureMode.AtPlayback);
+		}
+
+		/// <summary>
+		///   Process all stamp entities and apply them to affected chunks
+		/// </summary>
+		void ProcessAllStamps(
+			ref EntityCommandBuffer ecb,
+			ref VoxelSpatialSystem.VoxelObjectHash sh,
+			ref NativeParallelHashMap<int, int3> gridIdToDims,
+			ref SystemState state
+		)
+		{
 			using var stamps = m_StampQuery.ToComponentDataArray<NativeVoxelStampProcedural>(
 				Allocator.TempJob
 			);
 
 			foreach (var stamp in stamps)
 			{
+				DrawStampDebugGizmos(stamp);
+				using var objectsInBounds = sh.Query(stamp.bounds);
+
+				ProcessStampOnChunks(stamp, objectsInBounds, ref gridIdToDims, ref ecb, ref state);
+				SynchronizeAdjacentChunkOverlaps(objectsInBounds, ref ecb, ref state);
+			}
+		}
+
+		/// <summary>
+		///   Draw debug gizmos for stamp visualization
+		/// </summary>
+		static void DrawStampDebugGizmos(NativeVoxelStampProcedural stamp)
+		{
 #if ALINE && DEBUG
-				if (VoxelDebugging.IsEnabled && VoxelDebugging.Flags.stampGizmos)
-				{
-					Visual.Draw.PushDuration(.33f);
-					Visual.Draw.WireSphere(stamp.shape.sphere.center, stamp.shape.sphere.radius, Color.red);
-					Visual.Draw.WireBox(stamp.bounds.Center, stamp.bounds.Extents, Color.red);
-					Visual.Draw.PopDuration();
-				}
+			if (VoxelDebugging.IsEnabled && VoxelDebugging.Flags.stampGizmos)
+			{
+				Visual.Draw.PushDuration(.33f);
+				Visual.Draw.WireSphere(stamp.shape.sphere.center, stamp.shape.sphere.radius, Color.red);
+				Visual.Draw.WireBox(stamp.bounds.Center, stamp.bounds.Extents, Color.red);
+				Visual.Draw.PopDuration();
+			}
 #endif
+		}
 
-				using var chunksInBounds = sh.Query(stamp.bounds);
+		/// <summary>
+		///   Apply stamp to all chunks within bounds
+		/// </summary>
+		void ProcessStampOnChunks(
+			NativeVoxelStampProcedural stamp,
+			NativeList<SpatialVoxelObject> chunksInBounds,
+			ref NativeParallelHashMap<int, int3> gridIdToDims,
+			ref EntityCommandBuffer ecb,
+			ref SystemState state
+		)
+		{
+			foreach (var spatialVoxelObject in chunksInBounds)
+				ApplyStampToChunk(stamp, spatialVoxelObject, ref ecb, ref state);
+		}
 
-				foreach (var spatialVoxelObject in chunksInBounds)
+		/// <summary>
+		///   Apply stamp to a single chunk
+		/// </summary>
+		void ApplyStampToChunk(
+			NativeVoxelStampProcedural stamp,
+			SpatialVoxelObject spatialVoxelObject,
+			ref EntityCommandBuffer ecb,
+			ref SystemState state
+		)
+		{
+			var nvmRw = GetComponentRW<NativeVoxelMesh>(spatialVoxelObject.entity);
+			ref var nvm = ref nvmRw.ValueRW;
+
+			using (VoxelStampSystem_Schedule.Auto())
+			{
+				var applyParams = new StampScheduling.StampApplyParams
 				{
-					// Use the entity's NativeVoxelMesh buffers directly to preserve safety handles
-					var nvmRw = GetComponentRW<NativeVoxelMesh>(spatialVoxelObject.entity);
-					ref var nvm = ref nvmRw.ValueRW;
+					sdfScale = 16f / spatialVoxelObject.voxelSize,
+					deltaTime = SystemAPI.Time.DeltaTime,
+					alphaPerSecond = 60f,
+				};
 
-					// Enforce interior-only edits when rolling is enabled for the grid
-					if (HasComponent<Grids.NativeVoxelChunk>(spatialVoxelObject.entity))
-					{
-						var chunk = GetComponent<Grids.NativeVoxelChunk>(spatialVoxelObject.entity);
-						if (gridIdToDims.TryGetValue(chunk.gridID, out var dims))
-						{
-							var c = chunk.coord;
-							// editable window [2 .. dims-3] per axis
-							if (
-								c.x < 2
-								|| c.y < 2
-								|| c.z < 2
-								|| c.x > dims.x - 3
-								|| c.y > dims.y - 3
-								|| c.z > dims.z - 3
-							)
-								continue;
-						}
-					}
+				var applyStampJob = StampScheduling.ScheduleApplyStamp(
+					stamp,
+					spatialVoxelObject,
+					nvm,
+					applyParams,
+					GetFence(spatialVoxelObject.entity)
+				);
 
-					using (VoxelStampSystem_Schedule.Auto())
-					{
-#if !VMF_TAIL_PIPELINE
-						// Avoid scheduling writes while previous work for this entity is still in-flight
-						if (!TryComplete(spatialVoxelObject.entity))
-							continue;
-#endif
-
-						var applyParams = new StampScheduling.StampApplyParams
-						{
-							sdfScale = 16f / spatialVoxelObject.voxelSize,
-							deltaTime = SystemAPI.Time.DeltaTime,
-							alphaPerSecond = 20f,
-						};
-
-						var applyStampJob = StampScheduling.ScheduleApplyStamp(
-							stamp,
-							spatialVoxelObject,
-							nvm,
-							applyParams,
-							GetFence(spatialVoxelObject.entity)
-						);
-
-						UpdateFence(spatialVoxelObject.entity, applyStampJob);
-					}
-
-#if ALINE && DEBUG
-					if (VoxelDebugging.IsEnabled && VoxelDebugging.Flags.stampGizmos)
-					{
-						Visual.Draw.PushDuration(.33f);
-						Visual.Draw.PushMatrix(spatialVoxelObject.ltw);
-						Visual.Draw.WireBox(
-							spatialVoxelObject.localBounds.Center,
-							spatialVoxelObject.localBounds.Extents,
-							Color.white
-						);
-						Visual.Draw.PopMatrix();
-						Visual.Draw.PopDuration();
-					}
-#endif
-
-					ecb.SetComponentEnabled<NeedsRemesh>(spatialVoxelObject.entity, true);
-				}
-
-				// Synchronize the 2-voxel shared overlap between adjacent chunks that were stamped
-				for (var i = 0; i < chunksInBounds.Length; i++)
-				for (var j = i + 1; j < chunksInBounds.Length; j++)
-				{
-					var a = chunksInBounds[i];
-					var b = chunksInBounds[j];
-
-					if (
-						!HasComponent<NativeVoxelChunk>(a.entity) || !HasComponent<NativeVoxelChunk>(b.entity)
-					)
-						continue;
-
-					var ca = GetComponent<NativeVoxelChunk>(a.entity).coord;
-					var cb = GetComponent<NativeVoxelChunk>(b.entity).coord;
-
-					if (!StampScheduling.TryResolveAdjacency(ca, cb, out var axis, out var aIsSource))
-						continue;
-
-					var src = aIsSource ? a.entity : b.entity;
-					var dst = aIsSource ? b.entity : a.entity;
-
-					var dep = JobHandle.CombineDependencies(GetFence(src), GetFence(dst));
-
-					var srcNvm = GetComponentRW<NativeVoxelMesh>(src).ValueRO;
-					var dstNvm = GetComponentRW<NativeVoxelMesh>(dst).ValueRO;
-
-					var copyJob = StampScheduling.ScheduleCopySharedOverlap(srcNvm, dstNvm, axis, dep);
-
-					// Update both src and dst fences to serialize subsequent copy jobs that
-					// read from or write to either chunk in this frame.
-					UpdateFence(src, copyJob);
-					UpdateFence(dst, copyJob);
-					ecb.SetComponentEnabled<NeedsRemesh>(dst, true);
-				}
+				UpdateFence(spatialVoxelObject.entity, applyStampJob);
 			}
 
-			JobHandle.ScheduleBatchedJobs();
-			ecb.DestroyEntity(m_StampQuery, EntityQueryCaptureMode.AtPlayback);
+			DrawChunkDebugGizmos(spatialVoxelObject);
+			ecb.SetComponentEnabled<NeedsRemesh>(spatialVoxelObject.entity, true);
+		}
+
+		/// <summary>
+		///   Draw debug gizmos for chunk visualization
+		/// </summary>
+		static void DrawChunkDebugGizmos(SpatialVoxelObject spatialVoxelObject)
+		{
+#if ALINE && DEBUG
+			if (VoxelDebugging.IsEnabled && VoxelDebugging.Flags.stampGizmos)
+			{
+				Visual.Draw.PushDuration(.12f);
+				Visual.Draw.PushMatrix(spatialVoxelObject.ltw);
+				Visual.Draw.WireBox(
+					spatialVoxelObject.localBounds.Center,
+					spatialVoxelObject.localBounds.Extents,
+					Color.white
+				);
+				Visual.Draw.PopMatrix();
+				Visual.Draw.PopDuration();
+			}
+#endif
+		}
+
+		/// <summary>
+		///   Synchronize shared overlaps between adjacent chunks that were stamped
+		/// </summary>
+		void SynchronizeAdjacentChunkOverlaps(
+			NativeList<SpatialVoxelObject> chunksInBounds,
+			ref EntityCommandBuffer ecb,
+			ref SystemState state
+		)
+		{
+			for (var i = 0; i < chunksInBounds.Length; i++)
+			for (var j = i + 1; j < chunksInBounds.Length; j++)
+			{
+				var a = chunksInBounds[i];
+				var b = chunksInBounds[j];
+
+				if (!HasComponent<AtlasedChunk>(a.entity) || !HasComponent<AtlasedChunk>(b.entity))
+					continue;
+
+				var ca = GetComponent<AtlasedChunk>(a.entity).coord;
+				var cb = GetComponent<AtlasedChunk>(b.entity).coord;
+
+				if (!StampScheduling.TryResolveAdjacency(ca, cb, out var axis, out var aIsSource))
+					continue;
+
+				SynchronizeChunkPair(a.entity, b.entity, axis, aIsSource, ref ecb, ref state);
+			}
+		}
+
+		/// <summary>
+		///   Synchronize shared overlap between a pair of adjacent chunks
+		/// </summary>
+		void SynchronizeChunkPair(
+			Entity entityA,
+			Entity entityB,
+			int axis,
+			bool aIsSource,
+			ref EntityCommandBuffer ecb,
+			ref SystemState state
+		)
+		{
+			var src = aIsSource ? entityA : entityB;
+			var dst = aIsSource ? entityB : entityA;
+
+			var dep = JobHandle.CombineDependencies(GetFence(src), GetFence(dst));
+			var srcNvm = GetComponentRW<NativeVoxelMesh>(src).ValueRO;
+			var dstNvm = GetComponentRW<NativeVoxelMesh>(dst).ValueRO;
+			var copyJob = StampScheduling.ScheduleCopySharedOverlap(srcNvm, dstNvm, (byte)axis, dep);
+
+			// Update both src and dst fences to serialize subsequent copy jobs that
+			// read from or write to either chunk in this frame.
+			UpdateFence(src, copyJob);
+			UpdateFence(dst, copyJob);
+
+			ecb.SetComponentEnabled<NeedsRemesh>(dst, true);
 		}
 
 		[BurstCompile]

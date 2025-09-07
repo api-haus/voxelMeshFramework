@@ -134,8 +134,8 @@ namespace Voxels.Core.Diagnostics
 				"Voxels/Bridge/CreateGridEntity"
 			);
 
-			public static readonly ProfilerMarker RollingGridOrchestratorSystem_Update = new(
-				"Voxels/RollingGridOrchestratorSystem/Update"
+			public static readonly ProfilerMarker AtlasHybridInstantiationSystem_Update = new(
+				"Voxels/AtlasHybridInstantiationSystem/Update"
 			);
 		}
 	}

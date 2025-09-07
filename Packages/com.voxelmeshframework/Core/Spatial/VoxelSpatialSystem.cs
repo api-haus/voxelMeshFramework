@@ -1,9 +1,10 @@
 namespace Voxels.Core.Spatial
 {
 	using System;
+	using Atlasing.Components;
 	using Authoring;
 	using Debugging;
-	using Grids;
+	using Meshing.Components;
 	using Meshing.Tags;
 	using Unity.Burst;
 	using Unity.Collections;
@@ -55,9 +56,16 @@ namespace Voxels.Core.Spatial
 			var ecb = GetSingleton<EndInitST>().CreateCommandBuffer(state.WorldUnmanaged);
 
 			ref var st = ref GetSingletonRW<VoxelObjectHash>().ValueRW;
-
 			st.hash.Clear();
+			RebuildSpatialHash(ref state, ref st, ref ecb);
+		}
 
+		void RebuildSpatialHash(
+			ref SystemState state,
+			ref VoxelObjectHash st,
+			ref EntityCommandBuffer ecb
+		)
+		{
 			foreach (
 				var (objectRef, ltwRef, spatialRef, entity) in Query<
 					RefRO<NativeVoxelObject>,
@@ -65,12 +73,11 @@ namespace Voxels.Core.Spatial
 					RefRO<NeedsSpatialUpdate>
 				>()
 					.WithEntityAccess()
-					.WithAll<NeedsSpatialUpdate>()
+					.WithAll<NeedsSpatialUpdate, NativeVoxelMesh>()
 			)
 			{
 				ref readonly var obj = ref objectRef.ValueRO;
 				ref readonly var ltw = ref ltwRef.ValueRO;
-
 				st.Add(
 					new SpatialVoxelObject
 					{
@@ -81,7 +88,6 @@ namespace Voxels.Core.Spatial
 						wtl = inverse(ltw.Value),
 					}
 				);
-
 				ecb.SetComponentEnabled<NeedsSpatialUpdate>(entity, spatialRef.ValueRO.persistent);
 			}
 		}
@@ -114,9 +120,7 @@ namespace Voxels.Core.Spatial
 
 						var b = new MinMaxAABB(min, max);
 
-						Visual.Draw.PushDuration(.33f);
 						Visual.Draw.WireBox(b.Center, b.Extents, Color.blue);
-						Visual.Draw.PopDuration();
 					}
 #endif
 				}
@@ -124,13 +128,11 @@ namespace Voxels.Core.Spatial
 #if ALINE && DEBUG
 				if (VoxelDebugging.IsEnabled && VoxelDebugging.Flags.spatialSystemGizmos)
 				{
-					Visual.Draw.PushDuration(.33f);
 					Visual.Draw.WireBox(worldBounds.Center, worldBounds.Extents * 1.01f, Color.green);
 
 					Visual.Draw.PushMatrix(s.ltw);
 					Visual.Draw.WireBox(s.localBounds.Center, s.localBounds.Extents * 1.03f, Color.red);
 					Visual.Draw.PopMatrix();
-					Visual.Draw.PopDuration();
 				}
 #endif
 			}

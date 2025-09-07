@@ -2,7 +2,10 @@ namespace Voxels.Core.Meshing.Utilities
 {
 	using System;
 	using System.Collections.Generic;
-	using Procedural;
+	using Algorithms;
+	using Components;
+	using Managed;
+	using Procedural.Generators;
 	using Stamps;
 	using Unity.Collections;
 	using Unity.Jobs;
@@ -77,8 +80,7 @@ namespace Voxels.Core.Meshing.Utilities
 						voxelSize = voxelSize,
 						chunkSize = CHUNK_SIZE,
 						normalsMode = options.algorithm.normalsMode,
-						materialDistributionMode = options.algorithm.materialDistributionMode,
-						copyApronPostMesh = false,
+						materialEncoding = options.algorithm.materialEncoding,
 					};
 
 					var output = new MeshingOutputData

@@ -109,6 +109,18 @@ public static class VoxelAPI
 ---
 
 ## Roadmap
+### Next steps
+- Improve the public stamp API (see [SDF Brush plan](docs/sdf_brush_builder_future_plan.md)).
+- Extensive scene authoring with both procedural shapes and voxelised mesh geometry.
+- Investigate 3D clipmap-based LOD with toroidal updates.
+- Dual Contouring upgrade and research: [Executive summary](docs/_Spec/DUAL_CONTOURING_SUMMARY.md), [Implementation plan](docs/_Spec/dual_contouring_implementation_plan.md), [QEF solver](docs/_Spec/qef_solver_implementation.md), [Hermite storage](docs/_Spec/hermite_data_storage_design.md), [Shader system](docs/_Spec/dual_contouring_shader_system.md), [Multi‑material DC](docs/_Spec/multi_material_dual_contouring.md).
+- Surface fairing quality pass (label‑aware, constrained, iterative): [Plan](docs/_Spec/surface_fairing_implementation.md), [Blended materials notes](docs/surface_fairing_blended_materials.md), [ABI plan](docs/surface_fairing_abi_implementation_plan.md).
+- Materials and authoring pipeline: [Vertex color materials spec](docs/_Spec/materials_vertex_color_spec.md), [Material contouring](docs/_Spec/material_contouring_implementation.md), [Multi‑stream encoding plan](docs/material_encoding_multistream_impl_plan_v1.md).
+- Rolling grid and LOD: [Clipmap LOD spec](docs/clipmap_lod_rolling_grid_spec.md), [Rolling grid spec](docs/rolling_grid_single_spec.md), [Rolling grid implementation plan](docs/rolling_grid_single_implementation_plan.md).
+- Scheduling, budgets, and concurrency: [Background scheduling with fences](docs/background_workload_scheduling_with_fences.md), [Meshing budget](docs/meshing_budget.md), [Concurrency considerations](docs/meshing_concurrency_considerations.md).
+- Domain‑oriented refactor and helpers: [Domain decomposition](docs/domain_decomposition_plan_v1.md), [Consolidated refactor plan](docs/vmf_refactor_consolidated_plan_v1.md), [Static helpers plan](docs/vmf_static_helpers_refactor_plan_v1.md).
+- Core architecture and systems: [Overall spec](docs/_Spec/spec.md), [Unity implementation plan](docs/_Spec/implementation_plan_unity.md), [Systems & events](docs/_Spec/systems_events_data_structures.md), [Plugin architecture](docs/_Spec/voxel_plugin_architecture.md).
+- Performance and tests: [Surface Nets performance tests](docs/surfacenets_performance_tests_plan.md), [Grid fixed‑size implementation plan](docs/grid_fixed_size_implementation_plan.md).
 - File-backed chunk storage for persistence and streaming of voxel chunks.
 - Rolling grids with floating world origin for pseudo-infinite procedural worlds.
 - Dual Contouring implementation (Hermite/QEF) for exact sharp features.

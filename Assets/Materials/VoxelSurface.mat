@@ -25,14 +25,13 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - _TEX_SAMPLE_THREE
+  - _TEX_SAMPLE_TWO
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap:
-    RenderType: Opaque
+  stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
   m_LockedProperties: 
@@ -181,7 +180,7 @@ Material:
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
     - _Surface: 0
-    - _TEX_SAMPLE: 2
+    - _TEX_SAMPLE: 1
     - _TransitionSharpness: 18.41
     - _USE_DEBUG_WEIGHTS: 0
     - _USE_PARALLAX: 0

@@ -1,5 +1,6 @@
 namespace Voxels.Core.Procedural
 {
+	using Generators;
 	using Spatial;
 	using Unity.Jobs;
 	using Unity.Mathematics;

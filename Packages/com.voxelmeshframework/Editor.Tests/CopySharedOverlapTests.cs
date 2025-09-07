@@ -1,6 +1,6 @@
 namespace Voxels.Editor.Tests
 {
-	using Core.Meshing;
+	using Core.Atlasing.ChunkOverlaps;
 	using Core.Stamps;
 	using NUnit.Framework;
 	using Unity.Collections;

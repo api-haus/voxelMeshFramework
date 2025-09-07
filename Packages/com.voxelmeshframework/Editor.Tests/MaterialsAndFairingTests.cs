@@ -1,7 +1,8 @@
 namespace Voxels.Editor.Tests
 {
 	using Core.Meshing;
-	using Core.Meshing.Fairing;
+	using Core.Meshing.Algorithms;
+	using Core.Meshing.Algorithms.SurfaceNets.Fairing;
 	using Core.ThirdParty.SurfaceNets;
 	using Core.ThirdParty.SurfaceNets.Utils;
 	using NUnit.Framework;
@@ -23,12 +24,6 @@ namespace Voxels.Editor.Tests
 				SharedStaticMeshingResources.Initialize();
 
 			m_EdgeTable = SharedStaticMeshingResources.EdgeTable;
-		}
-
-		[OneTimeTearDown]
-		public void OneTimeTearDown()
-		{
-			// No cleanup needed for SharedStaticMeshingResources
 		}
 
 		NativeArray<ushort> m_EdgeTable;

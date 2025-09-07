@@ -30,11 +30,21 @@ namespace Voxels.Core.Authoring
 			s_flags.Data = visualDebugFlags;
 		}
 
+		// public static ref bool RunJobsSynchronously => ref s_flags.Data.runJobsSynchronously;
+
+		public static void SetRunJobsSynchronously(bool enabled)
+		{
+			s_flags.Data.runJobsSynchronously = enabled;
+		}
+
 		[Serializable]
 		public struct VisualDebugFlags
 		{
 			[HideInInspector]
 			public bool drawVisualGizmos;
+
+			[HideInInspector]
+			public bool runJobsSynchronously;
 
 			public bool spatialSystemGizmos;
 			public bool stampGizmos;

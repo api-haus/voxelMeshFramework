@@ -1,25 +1,18 @@
 namespace Voxels.Core.Stamps
 {
-	using Meshing;
+	using System;
+	using Atlasing.ChunkOverlaps;
+	using Meshing.Components;
 	using Spatial;
-	using Unity.Collections;
 	using Unity.Jobs;
 	using Unity.Mathematics;
 
 	public static class StampScheduling
 	{
-		[System.Serializable]
-		public struct StampApplyParams
-		{
-			public float sdfScale;
-			public float deltaTime;
-			public float alphaPerSecond;
-		}
-
 		public static JobHandle ScheduleApplyStamp(
 			in NativeVoxelStampProcedural stamp,
 			in SpatialVoxelObject svo,
-			in Meshing.NativeVoxelMesh nvm,
+			in NativeVoxelMesh nvm,
 			in StampApplyParams apply,
 			JobHandle inputDeps = default
 		)
@@ -42,8 +35,8 @@ namespace Voxels.Core.Stamps
 		}
 
 		public static JobHandle ScheduleCopySharedOverlap(
-			in Meshing.NativeVoxelMesh src,
-			in Meshing.NativeVoxelMesh dst,
+			in NativeVoxelMesh src,
+			in NativeVoxelMesh dst,
 			byte axis,
 			JobHandle inputDeps = default
 		)
@@ -114,6 +107,14 @@ namespace Voxels.Core.Stamps
 			axis = 0;
 			aIsSource = true;
 			return false;
+		}
+
+		[Serializable]
+		public struct StampApplyParams
+		{
+			public float sdfScale;
+			public float deltaTime;
+			public float alphaPerSecond;
 		}
 	}
 }

@@ -1,11 +1,15 @@
 namespace Voxels.Core.Config
 {
+	using Unity.Logging;
 	using UnityEngine;
 
 	public sealed class VoxelProjectSettings : ScriptableObject
 	{
-		[Header("Scheduling")]
-		public MeshSchedulingPolicy meshSchedulingPolicy = MeshSchedulingPolicy.WAIT_AND_DEBOUNCE;
+		[Tooltip("Log level in Build.")]
+		public LogLevel logLevelInGame = LogLevel.Warning;
+
+		[Tooltip("Log level in Editor.")]
+		public LogLevel logLevelInEditor = LogLevel.Info;
 
 		[Header("Fences")]
 		[Tooltip("Initial capacity for the per-entity JobHandle registry.")]

@@ -5,6 +5,7 @@ namespace Voxels.Samples.SampleControllers
 	using Unity.Mathematics.Geometry;
 	using UnityEngine;
 	using UnityEngine.InputSystem;
+	using static Unity.Mathematics.math;
 
 	[RequireComponent(typeof(Camera))]
 	public class SampleFirstPersonDiggingCamera : MonoBehaviour
@@ -19,12 +20,12 @@ namespace Voxels.Samples.SampleControllers
 		float radius = 1.5f;
 
 		[SerializeField]
-		[Range(1, 127)]
-		int digStrength = 1;
+		[Range(0.01f, 1f)]
+		float digStrength = 1;
 
 		[SerializeField]
-		[Range(1, 127)]
-		int placeStrength = 1;
+		[Range(0.01f, 1f)]
+		float placeStrength = 1;
 
 		[SerializeField]
 		float maxDistance = 20f;
@@ -36,46 +37,60 @@ namespace Voxels.Samples.SampleControllers
 		byte paintMaterial = 1;
 
 		[SerializeField]
-		Core.Stamps.StampScheduling.StampApplyParams applyParams = new()
-		{
-			sdfScale = 32f,
-			deltaTime = 0f,
-			alphaPerSecond = 20f,
-		};
-
-		readonly RaycastHit[] m_Hits = new RaycastHit[1];
+		int stampsPerSecond = 40;
 
 		Camera m_Camera;
 
 		bool m_DigPressed;
+		double m_LastTime;
 		bool m_PlacePressed;
+		double m_TimeStep;
 
 		void Awake()
 		{
+			OnValidate();
 			digAction.action.Enable();
 			placeAction.action.Enable();
 			TryGetComponent(out m_Camera);
+			m_LastTime = 0;
 		}
 
 		void Update()
 		{
 			m_DigPressed = digAction.action.IsPressed();
 			m_PlacePressed = placeAction.action.IsPressed();
+
+			DigUpdate();
 		}
 
-		void FixedUpdate()
+		void OnValidate()
 		{
-			ApplyStamp();
+			m_TimeStep = rcp(stampsPerSecond);
+		}
+
+		void DigUpdate()
+		{
+			var time = Time.realtimeSinceStartupAsDouble;
+			var dt = time - m_LastTime;
+			var times = (int)floor(dt / m_TimeStep);
+
+			if (times == 0)
+				return;
+
+			m_LastTime = time;
+
+			for (var i = 0; i < times; i++)
+				ApplyStamp();
 		}
 
 		void ApplyStamp()
 		{
 			var ray = m_Camera.ViewportPointToRay(Vector3.one * .5f);
 
-			if (Physics.RaycastNonAlloc(ray, m_Hits, maxDistance, layerMask) == 0)
+			if (!Physics.Raycast(ray, out var hit, maxDistance, layerMask))
 				return;
 
-			float3 point = m_Hits[0].point;
+			float3 point = hit.point;
 
 			var stamp = new NativeVoxelStampProcedural
 			{
@@ -95,12 +110,12 @@ namespace Voxels.Samples.SampleControllers
 
 			if (m_DigPressed)
 			{
-				stamp.strength = -digStrength / 127f;
+				stamp.strength = -digStrength;
 				VoxelAPI.Stamp(stamp);
 			}
 			else if (m_PlacePressed)
 			{
-				stamp.strength = placeStrength / 127f;
+				stamp.strength = placeStrength;
 				VoxelAPI.Stamp(stamp);
 			}
 		}

@@ -2,6 +2,9 @@ namespace Voxels.Performance.Tests
 {
 	using Core;
 	using Core.Meshing;
+	using Core.Meshing.Algorithms;
+	using Core.Meshing.Algorithms.SurfaceNets;
+	using Core.Meshing.Components;
 	using Core.ThirdParty.SurfaceNets;
 	using Core.ThirdParty.SurfaceNets.Utils;
 	using NUnit.Framework;
@@ -73,8 +76,7 @@ namespace Voxels.Performance.Tests
 				voxelSize = 1.0f,
 				chunkSize = VoxelConstants.CHUNK_SIZE,
 				normalsMode = normalsMode,
-				materialDistributionMode = MaterialDistributionMode.BLENDED_CORNER_SUM,
-				copyApronPostMesh = false,
+				materialEncoding = MaterialEncoding.COLOR_SPLAT_4,
 			};
 
 			var output = new MeshingOutputData

@@ -1,6 +1,6 @@
 namespace Voxels.Editor.Tests
 {
-	using Core.Meshing;
+	using Core.Meshing.Components;
 	using Core.Spatial;
 	using Core.Stamps;
 	using NUnit.Framework;

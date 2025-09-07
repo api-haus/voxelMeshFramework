@@ -1,0 +1,12 @@
+{
+	"name": "Project.Runtime",
+	"references": [
+		"Voxels.Core",
+		"Voxels.Runtime",
+		"Unity.Entities",
+		"Unity.Collections",
+		"Unity.Mathematics",
+		"Unity.Logging",
+		"Unity.Burst"
+	]
+}

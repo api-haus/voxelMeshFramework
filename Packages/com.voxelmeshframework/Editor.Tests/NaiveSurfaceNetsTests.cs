@@ -2,6 +2,7 @@ namespace Voxels.Editor.Tests
 {
 	using Core.Concurrency;
 	using Core.Meshing;
+	using Core.Meshing.Algorithms;
 	using Core.ThirdParty.SurfaceNets;
 	using Core.ThirdParty.SurfaceNets.Utils;
 	using NUnit.Framework;

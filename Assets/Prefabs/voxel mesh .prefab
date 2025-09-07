@@ -50,13 +50,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Voxels.Runtime::Voxels.Procedural.SimpleNoiseVoxelGenerator
   noiseFrequency: 0.08
-  groundPlaneY: 27
+  groundPlaneY: 2
   groundAmplitude: 2
   seed: 1133
   materialGround: 1
   materialGold: 2
   materialGrass: 4
   grassUpDotThreshold: 0.7
+  sdfSamplesPerVoxel: 16
 --- !u!114 &3849030783213709802
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -77,6 +78,7 @@ MonoBehaviour:
   materialGold: 2
   materialGrass: 4
   grassUpDotThreshold: 0.7
+  sdfSamplesPerVoxel: 16
 --- !u!114 &342125910084082715
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -91,9 +93,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Voxels.Runtime::Voxels.Authoring.VoxelMesh
   transformAttachment: 1
   voxelSize: 1
-  procedural: {fileID: 3849030783213709802}
+  procedural: {fileID: 3383048529032983038}
   meshingAlgorithm: 0
-  enableFairing: 1
+  normalsMode: 1
   fairingIterations: 10
   fairingStepSize: 0.3
   cellMargin: 0.1

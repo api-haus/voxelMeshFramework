@@ -51,21 +51,23 @@
     "com.unity.modules.video": "1.0.0",
     "com.unity.modules.vr": "1.0.0",
     "com.unity.modules.wind": "1.0.0",
-    "com.unity.modules.xr": "1.0.0"
+    "com.unity.modules.xr": "1.0.0",
+    "com.tayx.graphy": "3.0.5"
   },
   "scopedRegistries": [
-    {
-      "name": "package.openupm.com",
-      "url": "https://package.openupm.com",
-      "scopes": [
-        "com.jeffjadulco.guidregenerator"
-      ]
-    },
     {
       "name": "Keijiro",
       "url": "https://registry.npmjs.com",
       "scopes": [
         "jp.keijiro"
+      ]
+    },
+    {
+      "name": "package.openupm.com",
+      "url": "https://package.openupm.com",
+      "scopes": [
+        "com.jeffjadulco.guidregenerator",
+        "com.tayx.graphy"
       ]
     }
   ]

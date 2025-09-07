@@ -2,7 +2,10 @@
 	"name": "Voxels.Editor",
 	"rootNamespace": "Voxels",
 	"references": [
-		"Voxels.Core"
+		"Voxels.Core",
+		"Unity.Logging",
+		"Unity.Burst",
+		"Unity.Collections"
 	],
 	"includePlatforms": [
 		"Editor"

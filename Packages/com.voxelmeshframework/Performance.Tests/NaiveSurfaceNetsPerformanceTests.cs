@@ -2,6 +2,7 @@ namespace Voxels.Performance.Tests
 {
 	using Core;
 	using Core.Meshing;
+	using Core.Meshing.Algorithms;
 	using Core.ThirdParty.SurfaceNets;
 	using Core.ThirdParty.SurfaceNets.Utils;
 	using NUnit.Framework;

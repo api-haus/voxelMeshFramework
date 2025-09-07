@@ -1,20 +1,15 @@
 namespace Voxels.Core.Config
 {
+	using Concurrency;
 	using Unity.Burst;
+	using Unity.Logging;
 	using UnityEngine;
-
-	public enum MeshSchedulingPolicy : byte
-	{
-		[InspectorName("Debounce updates")]
-		WAIT_AND_DEBOUNCE = 0,
-
-		[InspectorName("Fire&Forget style schedule")]
-		TAIL_AND_PIPELINE = 1,
-	}
 
 	public struct VoxelProjectConfig
 	{
-		public MeshSchedulingPolicy meshSchedulingPolicy;
+		public bool loaded;
+		public LogLevel logLevelInGame;
+		public LogLevel logLevelInEditor;
 		public int fenceRegistryCapacity;
 	}
 
@@ -23,7 +18,18 @@ namespace Voxels.Core.Config
 		static readonly SharedStatic<VoxelProjectConfig> s_config =
 			SharedStatic<VoxelProjectConfig>.GetOrCreate<VoxelProjectConfig>();
 
-		public static bool IsCreated => true; // SharedStatic<T> is always available once type is initialized
+		internal static void RuntimeInit()
+		{
+			InitializeDefaults();
+
+			// Attempt to find a project settings asset in Resources (optional pattern)
+			var settings = Resources.Load<VoxelProjectSettings>("VoxelProjectSettings");
+			ApplyFromSettings(settings);
+
+			// Initialize fence registry with configured capacity
+			var cfg = Get();
+			VoxelJobFenceRegistry.Initialize(cfg.fenceRegistryCapacity);
+		}
 
 		public static void InitializeDefaults()
 		{
@@ -31,8 +37,9 @@ namespace Voxels.Core.Config
 			if (s_config.Data.fenceRegistryCapacity == 0)
 				s_config.Data = new VoxelProjectConfig
 				{
-					meshSchedulingPolicy = MeshSchedulingPolicy.WAIT_AND_DEBOUNCE,
 					fenceRegistryCapacity = 16384,
+					logLevelInEditor = LogLevel.Debug,
+					logLevelInGame = LogLevel.Warning,
 				};
 		}
 
@@ -56,7 +63,9 @@ namespace Voxels.Core.Config
 
 			s_config.Data = new VoxelProjectConfig
 			{
-				meshSchedulingPolicy = settings.meshSchedulingPolicy,
+				loaded = true,
+				logLevelInGame = settings.logLevelInGame,
+				logLevelInEditor = settings.logLevelInEditor,
 				fenceRegistryCapacity = settings.fenceRegistryCapacity,
 			};
 		}

@@ -1,11 +1,11 @@
 namespace Voxels.Core.Authoring
 {
-	using Meshing;
+	using Meshing.Algorithms;
 	using Procedural;
 	using Unity.Mathematics;
 	using UnityEngine;
+	using static Hybrid.VoxelEntityBridge;
 	using static VoxelConstants;
-	using static VoxelEntityBridge;
 
 	[RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 	public sealed class VoxelMesh : MonoBehaviour
@@ -45,8 +45,7 @@ namespace Voxels.Core.Authoring
 
 		[Header("Materials")]
 		[SerializeField]
-		internal MaterialDistributionMode materialDistributionMode =
-			MaterialDistributionMode.BLENDED_CORNER_SUM;
+		internal MaterialEncoding materialEncoding = MaterialEncoding.COLOR_SPLAT_4;
 
 		void Awake()
 		{

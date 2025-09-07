@@ -1,6 +1,6 @@
 namespace Voxels
 {
-	using Core;
+	using Core.Hybrid;
 	using Core.Stamps;
 
 	public static class VoxelAPI
