@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 81e9b7bd2569a8c4ca56c405342d1481
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 274875
+  packageName: Realistic Volume Profiles
+  packageVersion: 2.0 Major
+  assetPath: Assets/Realistic Volume Profiles/URP/Materials/Day Sky.mat
+  uploadId: 651129

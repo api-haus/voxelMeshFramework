@@ -13,8 +13,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - targetPlatform: WebGL
-            runner: ubuntu-latest
           - targetPlatform: Android
             runner: ubuntu-latest
           - targetPlatform: StandaloneWindows64

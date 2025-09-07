@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: e5ea9311f87873f4cb28a205892f7b8f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 274875
+  packageName: Realistic Volume Profiles
+  packageVersion: 2.0 Major
+  assetPath: Assets/Realistic Volume Profiles/HDRP/Volumes/Morning Postprocessing
+    Volume.asset
+  uploadId: 651129

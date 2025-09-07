@@ -37,7 +37,11 @@ void voxel_surface_half(in half4 materialWeights, in half3 worldSpacePosition,
                         out half oSmoothness, out half3 oEmission,
                         out half oOcclusion, out half3 oNormal) {
   kSampler s = (kSampler)0;
+#if _RP_HDRP
+  s.gather(worldSpaceNormal, GetAbsolutePositionWS(worldSpacePosition));
+#else
   s.gather(worldSpaceNormal, worldSpacePosition);
+#endif
 
   // Initialize blended properties
   oAlbedo = half3(0, 0, 0);

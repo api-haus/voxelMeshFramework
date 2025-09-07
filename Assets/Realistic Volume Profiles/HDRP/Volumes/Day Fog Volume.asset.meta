@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0c2c7b60321472e41adac75e45d53d0d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 274875
+  packageName: Realistic Volume Profiles
+  packageVersion: 2.0 Major
+  assetPath: Assets/Realistic Volume Profiles/HDRP/Volumes/Day Fog Volume.asset
+  uploadId: 651129
