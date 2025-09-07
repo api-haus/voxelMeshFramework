@@ -85,7 +85,7 @@ void voxel_surface_half(in half4 materialWeights, in half3 worldSpacePosition,
 
 #if _USE_PARALLAX
       // Apply parallax offset
-      half2 offset = ParallaxOffsetT(materialHeight, _Parallax, viewDirTS);
+      half2 offset = ParallaxOffsetStep(materialHeight, _Parallax, viewDirTS);
       s.offset(offset);
 
       // Re-sample with parallax offset

@@ -19,21 +19,32 @@ struct TriplanarTextureArraySampler {
   half2 uvyDy;
   half2 uvzDy;
 
+  half2 uvOffset;
+
   half4 sample(in int chan, TEXTURE2D_ARRAY(t2d), SAMPLER(smp)) {
-    half4 cx = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvx, chan, uvxDx, uvxDy) *
+    half4 cx = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvx + uvOffset, chan,
+                                           uvxDx, uvxDy) *
                blend.x;
-    half4 cy = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvy, chan, uvyDx, uvyDy) *
+    half4 cy = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvy + uvOffset, chan,
+                                           uvyDx, uvyDy) *
                blend.y;
-    half4 cz = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvz, chan, uvzDx, uvzDy) *
+    half4 cz = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvz + uvOffset, chan,
+                                           uvzDx, uvzDy) *
                blend.z;
     return (cx + cy + cz);
   }
 
   half sampleHeightLOD(in int chan, in int lod, TEXTURE2D_ARRAY(t2d),
                        SAMPLER(smp)) {
-    half cx = SAMPLE_TEXTURE2D_ARRAY_LOD(t2d, smp, uvx, chan, lod).a * blend.x;
-    half cy = SAMPLE_TEXTURE2D_ARRAY_LOD(t2d, smp, uvy, chan, lod).a * blend.y;
-    half cz = SAMPLE_TEXTURE2D_ARRAY_LOD(t2d, smp, uvz, chan, lod).a * blend.z;
+    half cx =
+        SAMPLE_TEXTURE2D_ARRAY_LOD(t2d, smp, uvx + uvOffset, chan, lod).a *
+        blend.x;
+    half cy =
+        SAMPLE_TEXTURE2D_ARRAY_LOD(t2d, smp, uvy + uvOffset, chan, lod).a *
+        blend.y;
+    half cz =
+        SAMPLE_TEXTURE2D_ARRAY_LOD(t2d, smp, uvz + uvOffset, chan, lod).a *
+        blend.z;
     return (cx + cy + cz);
   }
 
@@ -42,12 +53,15 @@ struct TriplanarTextureArraySampler {
   void sampleNormal(in float3 worldNormal, in int chan, TEXTURE2D_ARRAY(t2d),
                     SAMPLER(smp), out half3 normal, out half smoothness,
                     out half ao) {
-    half4 cx =
-        SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvx, chan, uvxDx, uvxDy).agrb;
-    half4 cy =
-        SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvy, chan, uvyDx, uvyDy).agrb;
-    half4 cz =
-        SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvz, chan, uvzDx, uvzDy).agrb;
+    half4 cx = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvx + uvOffset, chan,
+                                           uvxDx, uvxDy)
+                   .agrb;
+    half4 cy = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvy + uvOffset, chan,
+                                           uvyDx, uvyDy)
+                   .agrb;
+    half4 cz = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvz + uvOffset, chan,
+                                           uvzDx, uvzDy)
+                   .agrb;
 
     // Tangent space normal maps
     half3 tnormalX = unpack_normal(cx.xy);
@@ -90,11 +104,7 @@ struct TriplanarTextureArraySampler {
     uvzDy = ddy(uvz);
   }
 
-  void offset(in float2 offset) {
-    uvx += offset;
-    uvy += offset;
-    uvz += offset;
-  }
+  void offset(in float2 offset) { uvOffset = offset; }
 
   void gatherLOD(in float3 localNormal, in float3 localPos) {
     blend = normalize(pow(abs(localNormal), _BlendContrast / 8.0));

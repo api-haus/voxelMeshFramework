@@ -9,6 +9,8 @@ struct BiplanarTextureArraySampler {
   float3 worldPos;
   float3 worldNormal;
 
+  half2 uvOffset;
+
   half4 sample(in int chan, TEXTURE2D_ARRAY(t2d), SAMPLER(smp)) {
     // Coordinate derivatives for texturing
     float3 p = worldPos;
@@ -37,8 +39,10 @@ struct BiplanarTextureArraySampler {
     half2 uvaDy = half2(dpdy[ma.y], dpdy[ma.z]) * _UVScale;
     half2 uvbDy = half2(dpdy[me.y], dpdy[me.z]) * _UVScale;
 
-    half4 x = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uva, chan, uvaDx, uvaDy);
-    half4 y = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvb, chan, uvbDx, uvbDy);
+    half4 x = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uva + uvOffset, chan, uvaDx,
+                                          uvaDy);
+    half4 y = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvb + uvOffset, chan, uvbDx,
+                                          uvbDy);
 
     // Blend factors
     half2 w = half2(n[ma.x], n[me.x]);
@@ -74,8 +78,8 @@ struct BiplanarTextureArraySampler {
     half2 uva = half2(p[ma.y], p[ma.z]) * _UVScale;
     half2 uvb = half2(p[me.y], p[me.z]) * _UVScale;
 
-    half x = SAMPLE_TEXTURE2D_ARRAY_LOD(t2d, smp, uva, chan, lod).a;
-    half y = SAMPLE_TEXTURE2D_ARRAY_LOD(t2d, smp, uvb, chan, lod).a;
+    half x = SAMPLE_TEXTURE2D_ARRAY_LOD(t2d, smp, uva + uvOffset, chan, lod).a;
+    half y = SAMPLE_TEXTURE2D_ARRAY_LOD(t2d, smp, uvb + uvOffset, chan, lod).a;
 
     // Blend factors
     half2 w = half2(n[ma.x], n[me.x]);
@@ -120,10 +124,12 @@ struct BiplanarTextureArraySampler {
     half2 uvaDy = half2(dpdy[ma.y], dpdy[ma.z]) * _UVScale;
     half2 uvbDy = half2(dpdy[me.y], dpdy[me.z]) * _UVScale;
 
-    half4 x =
-        SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uva, chan, uvaDx, uvaDy).agrb;
-    half4 y =
-        SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvb, chan, uvbDx, uvbDy).agrb;
+    half4 x = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uva + uvOffset, chan, uvaDx,
+                                          uvaDy)
+                  .agrb;
+    half4 y = SAMPLE_TEXTURE2D_ARRAY_GRAD(t2d, smp, uvb + uvOffset, chan, uvbDx,
+                                          uvbDy)
+                  .agrb;
 
     half3 tA = unpack_normal(x.xy);
     half3 tB = unpack_normal(y.xy);
@@ -177,11 +183,5 @@ struct BiplanarTextureArraySampler {
     worldNormal = localNormal;
   }
 
-  void offset(in float2 offset) {
-    // Apply offset to world position for parallax effects
-    // This is a simplified approach - in practice, the offset should be applied
-    // per-axis based on the current projection, but for simplicity we apply to
-    // xy
-    worldPos.xy += offset / _UVScale;
-  }
+  void offset(in float2 offset) { uvOffset = offset; }
 };

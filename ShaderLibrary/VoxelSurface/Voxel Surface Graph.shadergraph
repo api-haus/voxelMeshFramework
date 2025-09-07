@@ -84,10 +84,10 @@
             "m_Id": "dd2295262fbf496e8d32203295c7a560"
         },
         {
-            "m_Id": "fa27dba5abd742378c93f555294396c9"
+            "m_Id": "5cb94b3df7d045b4a50e7f4b9eb4e3ca"
         },
         {
-            "m_Id": "5cb94b3df7d045b4a50e7f4b9eb4e3ca"
+            "m_Id": "fa27dba5abd742378c93f555294396c9"
         }
     ],
     "m_Nodes": [
@@ -966,7 +966,7 @@
     "m_FloatType": 1,
     "m_RangeValues": {
         "x": 0.0,
-        "y": 0.4000000059604645
+        "y": 1.0
     }
 }
 
