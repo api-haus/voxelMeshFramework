@@ -23,7 +23,8 @@
 	],
 	"autoReferenced": false,
 	"defineConstraints": [
-		"UNITY_INCLUDE_TESTS"
+		"UNITY_INCLUDE_TESTS",
+		"UNITY_6000_0_OR_LATER"
 	],
 	"versionDefines": [],
 	"noEngineReferences": false

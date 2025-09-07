@@ -56,7 +56,6 @@ namespace Voxels.Core.Spatial
 			var ecb = GetSingleton<EndInitST>().CreateCommandBuffer(state.WorldUnmanaged);
 
 			ref var st = ref GetSingletonRW<VoxelObjectHash>().ValueRW;
-			st.hash.Clear();
 			RebuildSpatialHash(ref state, ref st, ref ecb);
 		}
 
@@ -73,7 +72,7 @@ namespace Voxels.Core.Spatial
 					RefRO<NeedsSpatialUpdate>
 				>()
 					.WithEntityAccess()
-					.WithAll<NeedsSpatialUpdate, NativeVoxelMesh>()
+					.WithAll<NeedsSpatialUpdate, NativeVoxelMesh>() // todo: HasNonEmptyVoxelMesh, adjacent?
 			)
 			{
 				ref readonly var obj = ref objectRef.ValueRO;
@@ -88,7 +87,7 @@ namespace Voxels.Core.Spatial
 						wtl = inverse(ltw.Value),
 					}
 				);
-				ecb.SetComponentEnabled<NeedsSpatialUpdate>(entity, spatialRef.ValueRO.persistent);
+				ecb.SetComponentEnabled<NeedsSpatialUpdate>(entity, false);
 			}
 		}
 
@@ -110,12 +109,14 @@ namespace Voxels.Core.Spatial
 				for (var y = cellMin.y; y <= cellMax.y; y++)
 				for (var z = cellMin.z; z <= cellMax.z; z++)
 				{
-					hash.Add(new int3(x, y, z), s);
+					var k = new int3(x, y, z);
+
+					hash.Add(k, s);
 
 #if ALINE && DEBUG
 					if (VoxelDebugging.IsEnabled && VoxelDebugging.Flags.spatialSystemGizmos)
 					{
-						var min = new int3(x, y, z) * s_cellSize;
+						var min = k * s_cellSize;
 						var max = min + s_cellSize;
 
 						var b = new MinMaxAABB(min, max);

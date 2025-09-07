@@ -25,12 +25,12 @@ namespace Voxels.Core.Meshing
 
 			if (!EdgeTable.IsCreated)
 			{
-				EdgeTable = new(256, Allocator.Domain);
+				EdgeTable = new(256, Allocator.Persistent);
 				FillEdgeTable();
 			}
 
 			if (!VertexAttributes.IsCreated)
-				VertexAttributes = new(Vertex.VertexFormat, Allocator.Domain);
+				VertexAttributes = new(Vertex.VertexFormat, Allocator.Persistent);
 
 			// Application.quitting += Release;
 		}

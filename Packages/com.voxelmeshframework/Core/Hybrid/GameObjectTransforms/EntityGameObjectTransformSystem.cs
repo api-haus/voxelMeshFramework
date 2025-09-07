@@ -1,5 +1,6 @@
 namespace Voxels.Core.Hybrid.GameObjectTransforms
 {
+	using Meshing.Tags;
 	using Unity.Entities;
 	using Unity.Transforms;
 	using static Diagnostics.VoxelProfiler.Marks;
@@ -15,11 +16,13 @@ namespace Voxels.Core.Hybrid.GameObjectTransforms
 			using (EntityGameObjectTransformSystem_UpdateLocalToWorld.Auto())
 			{
 				foreach (
-					var (ltwRef, trs) in SystemAPI.Query<
-						RefRW<LocalToWorld>,
-						// ReSharper disable once Unity.Entities.MustBeSurroundedWithRefRwRo
-						EntityFollowsGameObjectTransform
-					>()
+					var (ltwRef, trs) in SystemAPI
+						.Query<
+							RefRW<LocalToWorld>,
+							// ReSharper disable once Unity.Entities.MustBeSurroundedWithRefRwRo
+							EntityFollowsGameObjectTransform
+						>()
+						.WithAll<HasNonEmptyVoxelMesh>()
 				)
 				{
 					if (null == trs || !trs.attachTo)

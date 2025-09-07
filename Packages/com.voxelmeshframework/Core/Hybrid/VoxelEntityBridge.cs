@@ -99,6 +99,7 @@ namespace Voxels.Core.Hybrid
 				{
 					typeof(NeedsRemesh),
 					typeof(LocalToWorld),
+					typeof(HasNonEmptyVoxelMesh),
 					typeof(NativeVoxelObject),
 					typeof(NeedsSpatialUpdate),
 					typeof(NeedsManagedMeshUpdate),
@@ -169,7 +170,7 @@ namespace Voxels.Core.Hybrid
 				new EntityMeshFilterAttachment { attachTo = vm.GetComponent<MeshFilter>() }
 			);
 			em.SetComponentData(ent, new LocalToWorld { Value = vm.transform.localToWorldMatrix });
-			em.SetComponentData(ent, new NeedsSpatialUpdate { persistent = attachTransform });
+			em.SetComponentData(ent, new NeedsSpatialUpdate());
 
 			if (attachTransform)
 				em.SetComponentData(
@@ -207,7 +208,6 @@ namespace Voxels.Core.Hybrid
 					typeof(LocalTransform),
 					typeof(NativeChunkAtlas),
 					typeof(LinkedEntityGroup),
-					typeof(NeedsSpatialUpdate),
 					typeof(ChunkPrefabSettings),
 					typeof(AtlasNeedsAllocation),
 					typeof(NativeChunkAtlas.CleanupTag),
@@ -230,7 +230,6 @@ namespace Voxels.Core.Hybrid
 			em.SetName(ent, vm.gameObject.name);
 
 			// Initialize enableable tags on grid root
-			em.SetComponentEnabled<NeedsSpatialUpdate>(ent, false);
 			em.SetComponentEnabled<AtlasNeedsAllocation>(ent, true);
 
 			em.SetComponentData(
@@ -258,7 +257,6 @@ namespace Voxels.Core.Hybrid
 					Scale = cmax(vm.transform.localScale),
 				}
 			);
-			em.SetComponentData(ent, new NeedsSpatialUpdate { persistent = attachTransform });
 
 			// Provide chunk prefab + material settings for hybrid instantiation
 			em.SetComponentData(ent, new ChunkPrefabSettings { prefab = vm.chunkPrefab });

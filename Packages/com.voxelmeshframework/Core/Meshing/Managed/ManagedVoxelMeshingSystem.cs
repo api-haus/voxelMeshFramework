@@ -99,6 +99,7 @@ namespace Voxels.Core.Meshing.Managed
 				}
 
 				ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(entity, false);
+				ecb.SetComponentEnabled<HasNonEmptyVoxelMesh>(entity, hasMesh);
 
 				if (EntityManager.HasComponent<AtlasedChunk>(entity))
 				{

@@ -47,6 +47,7 @@ namespace Voxels.Core.Atlasing.Scheduling
 				typeof(LocalToWorld),
 				typeof(NeedsRemesh),
 				typeof(AtlasedChunk),
+				typeof(HasNonEmptyVoxelMesh),
 				typeof(NativeVoxelObject),
 				typeof(NeedsSpatialUpdate),
 				typeof(NeedsProceduralUpdate),
@@ -233,7 +234,7 @@ namespace Voxels.Core.Atlasing.Scheduling
 			ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(chunk, false);
 
 			// For newly allocated chunks, the component exists in the archetype; enable for first schedule
-			ecb.SetComponent(chunk, new NeedsSpatialUpdate { persistent = true });
+			ecb.SetComponent(chunk, new NeedsSpatialUpdate());
 			ecb.SetComponentEnabled<NeedsSpatialUpdate>(chunk, true);
 
 			ecb.SetComponentEnabled<ChunkNeedsHybridAllocation>(chunk, true);
