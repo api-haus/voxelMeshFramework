@@ -2,7 +2,7 @@ name: GameCI Build
 on:
   workflow_dispatch:
   push:
-    branches: [main, develop]
+    branches: [ main, develop ]
   pull_request:
 
 jobs:
@@ -13,8 +13,6 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - targetPlatform: Android
-            runner: ubuntu-latest
           - targetPlatform: StandaloneWindows64
             runner: windows-latest
 

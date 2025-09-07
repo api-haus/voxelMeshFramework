@@ -170,6 +170,7 @@ Material:
     - _DoubleSidedGIMode: 0
     - _DoubleSidedNormalMode: 2
     - _DstBlend: 0
+    - _DstBlend2: 0
     - _DstBlendAlpha: 0
     - _EmissiveStrength: 2
     - _EnableBlendModePreserveSpecularLighting: 1
@@ -182,6 +183,8 @@ Material:
     - _Glossiness: 0
     - _GlossyReflections: 0
     - _MaterialContrast: 4
+    - _MaterialID: 1
+    - _MaterialTypeMask: 2
     - _Metallic: 0
     - _NormalScale: 1
     - _NormalStrength: 1
@@ -190,6 +193,7 @@ Material:
     - _PARALLAX: 1
     - _POMSteps: 3
     - _Parallax: 0.1
+    - _PerPixelSorting: 0
     - _QueueControl: 1
     - _QueueOffset: 0
     - _RayTracing: 0
@@ -221,6 +225,7 @@ Material:
     - _SurfaceType: 0
     - _TEX_SAMPLE: 1
     - _TransitionSharpness: 18.41
+    - _TransmissionEnable: 1
     - _TransparentBackfaceEnable: 0
     - _TransparentCullMode: 2
     - _TransparentDepthPostpassEnable: 0
@@ -258,6 +263,7 @@ Material:
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _Tint: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!114 &7253277774572144206
 MonoBehaviour:
   m_ObjectHideFlags: 11
