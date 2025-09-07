@@ -1,0 +1,79 @@
+name: GameCI Build
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  build:
+    name: Build (${{ matrix.targetPlatform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - targetPlatform: WebGL
+            runner: ubuntu-latest
+          - targetPlatform: Android
+            runner: ubuntu-latest
+          - targetPlatform: StandaloneWindows64
+            runner: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Read Unity version
+        id: unityVersion
+        uses: actions/github-script@v7
+        with:
+          result-encoding: string
+          script: |
+            const fs = require('fs');
+            const path = 'ProjectSettings/ProjectVersion.txt';
+            let version = '';
+            if (fs.existsSync(path)) {
+              const content = fs.readFileSync(path, 'utf8');
+              const match = content.match(/m_EditorVersion:\s*([^\s]+)/);
+              if (match) { version = match[1].trim(); }
+            }
+            if (!version) {
+              throw new Error('Could not determine Unity version from ProjectSettings/ProjectVersion.txt');
+            }
+            return version;
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ steps.unityVersion.outputs.result }}-${{ matrix.targetPlatform }}-${{ hashFiles('Packages/manifest.json', 'ProjectSettings/ProjectSettings.asset') }}
+          restore-keys: |
+            Library-${{ steps.unityVersion.outputs.result }}-${{ matrix.targetPlatform }}-
+
+      - name: Unity - Builder
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          projectPath: .
+          unityVersion: ${{ steps.unityVersion.outputs.result }}
+          targetPlatform: ${{ matrix.targetPlatform }}
+          buildName: ${{ github.event.repository.name }}
+          buildsPath: build
+          # For Android signing or advanced options, add inputs here per GameCI docs
+
+      - name: Upload build artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.targetPlatform }}-build
+          path: |
+            build/${{ matrix.targetPlatform }}/
+          if-no-files-found: error
+          compression-level: 6
+          overwrite: true
