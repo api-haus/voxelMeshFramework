@@ -1,0 +1,82 @@
+namespace Voxels.Core.Meshing.Scheduling
+{
+	using Budgets;
+	using Components;
+	using Concurrency;
+	using Unity.Burst;
+	using Unity.Collections;
+	using Unity.Entities;
+	using static Diagnostics.VoxelProfiler.Marks;
+	using static Unity.Entities.SystemAPI;
+	using EndInitST = Unity.Entities.EndInitializationEntityCommandBufferSystem.Singleton;
+	using ISystem = Unity.Entities.ISystem;
+	using SystemState = Unity.Entities.SystemState;
+
+	[UpdateInGroup(typeof(InitializationSystemGroup))]
+	public partial struct VoxelMeshAllocationSystem : ISystem
+	{
+		[BurstCompile]
+		public void OnCreate(ref SystemState state)
+		{
+			state.RequireForUpdate<EndInitST>();
+
+			foreach (var nativeVoxelMesh in Query<RefRW<NativeVoxelMesh>>())
+				nativeVoxelMesh.ValueRW.Dispose();
+		}
+
+		[BurstCompile]
+		public void OnDestroy(ref SystemState state)
+		{
+			foreach (var nativeVoxelMesh in Query<RefRW<NativeVoxelMesh>>())
+				nativeVoxelMesh.ValueRW.Dispose();
+		}
+
+		[BurstCompile]
+		public void OnUpdate(ref SystemState state)
+		{
+			using var _ = VoxelMeshAllocationSystem_Update.Auto();
+
+			var ecb = GetSingleton<EndInitST>().CreateCommandBuffer(state.WorldUnmanaged);
+
+			AllocateRequestedMeshes(ref state, ref ecb);
+			CleanupUnrequestedMeshes(ref state, ref ecb);
+		}
+
+		void AllocateRequestedMeshes(ref SystemState state, ref EntityCommandBuffer ecb)
+		{
+			var toProcess = VoxelBudgets.Current.perFrame.memoryAllocated;
+
+			foreach (
+				var (req, entity) in Query<RefRO<NativeVoxelMesh.Request>>()
+					.WithNone<NativeVoxelMesh>()
+					.WithEntityAccess()
+			)
+			{
+				using (VoxelMeshAllocationSystem_Allocate.Auto())
+				{
+					var nvm = new NativeVoxelMesh(Allocator.Persistent);
+					nvm.volume.voxelSize = req.ValueRO.voxelSize;
+					ecb.AddComponent(entity, nvm);
+				}
+
+				if (--toProcess <= 0)
+					return;
+			}
+		}
+
+		void CleanupUnrequestedMeshes(ref SystemState state, ref EntityCommandBuffer ecb)
+		{
+			foreach (
+				var (nativeVoxelMesh, entity) in Query<RefRW<NativeVoxelMesh>>()
+					.WithNone<NativeVoxelMesh.Request>()
+					.WithEntityAccess()
+			)
+				using (VoxelMeshAllocationSystem_Cleanup.Auto())
+				{
+					VoxelJobFenceRegistry.CompleteAndReset(entity);
+					nativeVoxelMesh.ValueRW.Dispose();
+					ecb.RemoveComponent<NativeVoxelMesh>(entity);
+				}
+		}
+	}
+}

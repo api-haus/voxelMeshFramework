@@ -1,0 +1,21 @@
+{
+	"name": "Voxels.Editor",
+	"rootNamespace": "Voxels",
+	"references": [
+		"Voxels.Core",
+		"Unity.Logging",
+		"Unity.Burst",
+		"Unity.Collections"
+	],
+	"includePlatforms": [
+		"Editor"
+	],
+	"excludePlatforms": [],
+	"allowUnsafeCode": false,
+	"overrideReferences": false,
+	"precompiledReferences": [],
+	"autoReferenced": false,
+	"defineConstraints": [],
+	"versionDefines": [],
+	"noEngineReferences": false
+}

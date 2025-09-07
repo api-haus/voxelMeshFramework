@@ -1,0 +1,31 @@
+{
+	"name": "Voxels.Editor.Tests",
+	"rootNamespace": "Voxels",
+	"references": [
+		"UnityEngine.TestRunner",
+		"UnityEditor.TestRunner",
+		"Unity.PerformanceTesting",
+		"Unity.Mathematics",
+		"Unity.Collections",
+		"Unity.Burst",
+		"Unity.Entities",
+		"Unity.Transforms",
+		"Voxels.Core",
+		"Voxels.Runtime"
+	],
+	"includePlatforms": [
+		"Editor"
+	],
+	"excludePlatforms": [],
+	"allowUnsafeCode": true,
+	"overrideReferences": true,
+	"precompiledReferences": [
+		"nunit.framework.dll"
+	],
+	"autoReferenced": false,
+	"defineConstraints": [
+		"UNITY_INCLUDE_TESTS"
+	],
+	"versionDefines": [],
+	"noEngineReferences": false
+}

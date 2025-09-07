@@ -1,0 +1,15 @@
+{
+	"name": "Voxels.SampleControllers",
+	"rootNamespace": "Voxels",
+	"references": [
+		"Voxels.Runtime",
+		"Unity.Mathematics",
+		"Unity.Collections",
+		"Unity.InputSystem",
+		"Voxels.Core",
+		"Unity.Burst",
+		"Unity.Logging",
+		"Unity.Entities"
+	],
+	"autoReferenced": false
+}
