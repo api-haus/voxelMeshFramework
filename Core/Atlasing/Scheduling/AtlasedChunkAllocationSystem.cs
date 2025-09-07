@@ -125,7 +125,7 @@ namespace Voxels.Core.Atlasing.Scheduling
 					if (existing.ContainsKey(coord))
 						continue;
 					var chunk = CreateChunkEntity(ref ecb, coord, atlas, ltw, atlas.voxelSize, chunkStride);
-					ConfigureChunkComponents(ref state, ref ecb, entity, chunk);
+					ConfigureChunkComponents(ref state, ref ecb, atlas, entity, chunk);
 					ecb.AppendToBuffer(entity, new LinkedEntityGroup { Value = chunk });
 
 					var pendingCounter = atlas.counters.Pending().Add(1) + 1;
@@ -212,11 +212,12 @@ namespace Voxels.Core.Atlasing.Scheduling
 		void ConfigureChunkComponents(
 			ref SystemState state,
 			ref EntityCommandBuffer ecb,
+			NativeChunkAtlas atlas,
 			Entity gridEntity,
 			Entity chunk
 		)
 		{
-			SetupChunkLifecycleComponents(ref ecb, chunk, ref state);
+			SetupChunkLifecycleComponents(ref ecb, atlas, chunk, ref state);
 			InheritGridSettings(ref state, ref ecb, gridEntity, chunk);
 		}
 
@@ -225,6 +226,7 @@ namespace Voxels.Core.Atlasing.Scheduling
 		/// </summary>
 		void SetupChunkLifecycleComponents(
 			ref EntityCommandBuffer ecb,
+			NativeChunkAtlas atlas,
 			Entity chunk,
 			ref SystemState state
 		)
@@ -234,8 +236,7 @@ namespace Voxels.Core.Atlasing.Scheduling
 			ecb.SetComponentEnabled<NeedsManagedMeshUpdate>(chunk, false);
 
 			// For newly allocated chunks, the component exists in the archetype; enable for first schedule
-			ecb.SetComponent(chunk, new NeedsSpatialUpdate());
-			ecb.SetComponentEnabled<NeedsSpatialUpdate>(chunk, true);
+			ecb.SetComponentEnabled<NeedsSpatialUpdate>(chunk, atlas.editable);
 
 			ecb.SetComponentEnabled<ChunkNeedsHybridAllocation>(chunk, true);
 		}

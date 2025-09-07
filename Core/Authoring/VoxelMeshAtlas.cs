@@ -15,6 +15,9 @@ namespace Voxels.Core.Authoring
 		internal bool transformAttachment;
 
 		[SerializeField]
+		internal bool stampEditable = true;
+
+		[SerializeField]
 		internal GameObject chunkPrefab;
 
 		[SerializeField]

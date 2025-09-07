@@ -237,6 +237,7 @@ namespace Voxels.Core.Hybrid
 				new NativeChunkAtlas
 				{
 					//
+					editable = vm.stampEditable,
 					atlasId = instanceId,
 					voxelSize = vm.voxelSize,
 					bounds = new(vm.gridBounds.min, vm.gridBounds.max),

@@ -10,6 +10,7 @@ namespace Voxels.Core.Atlasing.Components
 		public struct CleanupTag : IComponentData { }
 
 		public int atlasId;
+		public bool editable;
 		public float voxelSize;
 		public MinMaxAABB bounds;
 		public ChunkAtlasCounters counters;
