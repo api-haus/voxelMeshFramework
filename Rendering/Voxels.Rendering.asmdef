@@ -5,7 +5,9 @@
 		"Unity.RenderPipelines.Universal.Runtime",
 		"Unity.Entities",
 		"Unity.Burst",
-		"Unity.Collections"
+		"Unity.Collections",
+		"Adobe.Substance",
+		"Adobe.Substance.Runtime"
 	],
 	"versionDefines": [
 		{
@@ -17,6 +19,11 @@
 			"name": "com.unity.render-pipelines.universal",
 			"expression": "14.0.0",
 			"define": "URP_14_0_0"
+		},
+		{
+			"name": "adobe.substance3d",
+			"expression": "1.0.0",
+			"define": "ADOBE_SUBSTANCE3D"
 		}
 	]
 }
