@@ -1,12 +1,12 @@
 namespace Voxels.Core.Atlasing.Hybrid
 {
-	using Budgets;
 	using Components;
 	using Core.Hybrid;
 	using Core.Hybrid.GameObjectCollision;
 	using Core.Hybrid.GameObjectRendering;
 	using Core.Hybrid.GameObjectTransforms;
 	using Diagnostics;
+	using Meshing.Budgets;
 	using Unity.Entities;
 	using Unity.Transforms;
 	using UnityEngine;
@@ -30,7 +30,7 @@ namespace Voxels.Core.Atlasing.Hybrid
 			var ecb = SystemAPI.GetSingleton<EndSimST>().CreateCommandBuffer(World.Unmanaged);
 
 			//TODO: fix chunksCreated limiter, it causes chunks to get stuck
-			var toProcess = VoxelBudgets.Current.perFrame.chunksCreated;
+			var toProcess = MeshingBudgets.Current.perFrame.chunksCreated;
 
 			foreach (
 				var (chunk, ltw, entity) in Query<AtlasedChunk, LocalToWorld>()

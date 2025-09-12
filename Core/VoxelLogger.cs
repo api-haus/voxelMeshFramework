@@ -13,12 +13,11 @@ namespace Voxels.Core
 		public static void InitializeFromConfiguration()
 		{
 			var cfg = new LoggerConfig();
+			var level = Application.isEditor
+				? VoxelProjectConfiguration.Get().logLevelInEditor
+				: VoxelProjectConfiguration.Get().logLevelInGame;
 
-			cfg = cfg.MinimumLevel.Set(
-				Application.isEditor
-					? VoxelProjectConfiguration.Get().logLevelInEditor
-					: VoxelProjectConfiguration.Get().logLevelInGame
-			);
+			cfg = cfg.MinimumLevel.Set(level);
 
 #if UNITY_EDITOR
 			cfg = cfg.WriteTo.UnityEditorConsole(

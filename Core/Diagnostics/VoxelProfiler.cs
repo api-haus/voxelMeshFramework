@@ -16,10 +16,6 @@ namespace Voxels.Core.Diagnostics
 				"Voxels/Meshing/Perform/NaiveSurfaceNets"
 			);
 
-			public static readonly ProfilerMarker VoxelMeshingSystem_Perform_Fair = new(
-				"Voxels/Meshing/Perform/NaiveSurfaceNets/Fairing"
-			);
-
 			public static readonly ProfilerMarker VoxelMeshingSystem_Upload = new(
 				"Voxels/Meshing/Schedule/UploadMeshJob"
 			);

@@ -1,6 +1,7 @@
 namespace Voxels.Core.Concurrency
 {
 	using System;
+	using Meshing.Budgets;
 	using Unity.Burst;
 	using Unity.Collections;
 	using Unity.Entities;
@@ -66,7 +67,8 @@ namespace Voxels.Core.Concurrency
 		{
 			if (!Registry.entityJobs.TryGetValue(e, out var h))
 				return true;
-			if (h.Equals(default) || h.IsCompleted)
+			var isAsync = MeshingBudgets.Current.async;
+			if (h.Equals(default) || h.IsCompleted || !isAsync)
 			{
 				// Complete the fence, to ensure all workloads are complete. This is required, since Unity made it this way.
 				h.Complete();

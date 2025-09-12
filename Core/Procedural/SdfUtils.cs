@@ -5,6 +5,9 @@ namespace Voxels.Core.Procedural
 	using Unity.Mathematics;
 	using static Unity.Mathematics.math;
 
+	/// <summary>
+	///   Heavily inspired by Inigo Quilez on 3D SDF.
+	/// </summary>
 	public static class sdf
 	{
 		/// <summary>

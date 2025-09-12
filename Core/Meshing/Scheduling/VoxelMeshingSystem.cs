@@ -45,7 +45,7 @@ namespace Voxels.Core.Meshing.Scheduling
 		/// </summary>
 		void ScheduleMeshingForEntities(ref SystemState state, ref EntityCommandBuffer ecb)
 		{
-			var toProcess = VoxelBudgets.Current.perFrame.reMeshScheduled;
+			var toProcess = MeshingBudgets.Current.perFrame.meshingSchedule;
 
 			foreach (
 				var (nativeVoxelMeshRef, algorithm, entity) in Query<
@@ -105,13 +105,7 @@ namespace Voxels.Core.Meshing.Scheduling
 			};
 
 			var pre = GetFence(entity);
-			var meshingJob = MeshingScheduling.ScheduleAlgorithm(
-				input,
-				output,
-				algorithm,
-				ref nvm.meshing.fairing,
-				pre
-			);
+			var meshingJob = MeshingScheduling.ScheduleAlgorithm(input, output, algorithm, pre);
 
 			meshingJob = new UploadMeshJob
 			{

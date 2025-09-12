@@ -1,7 +1,7 @@
 namespace Voxels.Core.Procedural.Scheduling
 {
 	using Atlasing.Components;
-	using Budgets;
+	using Meshing.Budgets;
 	using Meshing.Components;
 	using Meshing.Tags;
 	using Tags;
@@ -22,7 +22,7 @@ namespace Voxels.Core.Procedural.Scheduling
 
 			var ecb = SystemAPI.GetSingleton<EndSimST>().CreateCommandBuffer(World.Unmanaged);
 
-			var toProcess = VoxelBudgets.Current.perFrame.proceduralScheduled;
+			var toProcess = MeshingBudgets.Current.perFrame.proceduralSchedule;
 
 			foreach (
 				var (pcg, voxelObjectRef, voxelMeshRef, ltwRef, entity) in

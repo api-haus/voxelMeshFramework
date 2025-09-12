@@ -126,12 +126,12 @@ namespace Voxels.Samples.SampleControllers
 			if (m_DigPressed)
 			{
 				stamp.strength = -digStrength;
-				VoxelAPI.Stamp(stamp);
+				VoxelAPI.Stamps.Apply(stamp);
 			}
 			else if (m_PlacePressed)
 			{
 				stamp.strength = placeStrength;
-				VoxelAPI.Stamp(stamp);
+				VoxelAPI.Stamps.Apply(stamp);
 			}
 		}
 	}

@@ -9,10 +9,6 @@
 #elif defined(_TEX_SAMPLE_THREE)
 #include "./Triplanar.hlsl"
 #define kSampler TriplanarTextureArraySampler
-#else
-// Default to triplanar if no sampling mode is defined
-#include "./Triplanar.hlsl"
-#define kSampler TriplanarTextureArraySampler
 #endif
 
 #include "./Parallax.hlsl"
@@ -37,11 +33,13 @@ void voxel_surface_half(in half4 materialWeights, in half3 worldSpacePosition,
                         out half oMetallic, out half oSmoothness,
                         out half3 oEmission, out half oOcclusion,
                         out half3 oNormal) {
+#ifdef kSampler
   kSampler s = (kSampler)0;
 #if _RP_HDRP
   s.gather(worldSpaceNormal, GetAbsolutePositionWS(worldSpacePosition));
 #else
   s.gather(worldSpaceNormal, worldSpacePosition);
+#endif
 #endif
 
   // Initialize blended properties
@@ -52,6 +50,10 @@ void voxel_surface_half(in half4 materialWeights, in half3 worldSpacePosition,
   oOcclusion = 0;
   oNormal = half3(0, 0, 1);
 
+#ifndef kSampler
+  oAlbedo = materialWeights;
+  oNormal = worldSpaceNormal;
+#else
   // Normalize weights (should already be normalized, but ensure safety)
   half4 weights = materialWeights;
   half totalWeight = weights.r + weights.g + weights.b + weights.a;
@@ -73,8 +75,7 @@ void voxel_surface_half(in half4 materialWeights, in half3 worldSpacePosition,
   }
 
   // Sample and blend up to 4 materials
-  UNITY_UNROLL
-  for (int matIdx = 0; matIdx < 4; matIdx++) {
+  UNITY_UNROLL for (int matIdx = 0; matIdx < 4; matIdx++) {
     half weight = weights[matIdx];
 
     if (weight > 0.01) {
@@ -116,6 +117,7 @@ void voxel_surface_half(in half4 materialWeights, in half3 worldSpacePosition,
 
   // Normalize accumulated normal
   oNormal = normalize(oNormal);
+#endif
 
 #if _USE_FRESNEL
   oAlbedo +=

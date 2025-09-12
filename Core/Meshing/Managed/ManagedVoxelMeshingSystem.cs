@@ -49,7 +49,7 @@ namespace Voxels.Core.Meshing.Managed
 		/// <param name="ecb">Command buffer for structural changes.</param>
 		void ApplyManagedMeshesForReadyEntities(ref EntityCommandBuffer ecb)
 		{
-			var toProcess = VoxelBudgets.Current.perFrame.meshApplied;
+			var toProcess = MeshingBudgets.Current.perFrame.meshApplied;
 
 			foreach (
 				var (nativeVoxelMeshRef, entity) in Query<RefRW<NativeVoxelMesh>>()

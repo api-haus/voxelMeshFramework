@@ -2,6 +2,7 @@ namespace Voxels.Samples.SampleControllers
 {
 	using Core.Authoring;
 	using Core.Hybrid;
+	using Core.Meshing.Budgets;
 	using UnityEngine;
 	using UnityEngine.Events;
 
@@ -35,11 +36,13 @@ namespace Voxels.Samples.SampleControllers
 
 		void OnBeginLoading()
 		{
+			VoxelAPI.Budgets.Apply(MeshingBudgets.HeavyLoading);
 			Time.timeScale = 0;
 		}
 
 		void OnFinishLoading()
 		{
+			VoxelAPI.Budgets.Apply(MeshingBudgets.Realtime);
 			Time.timeScale = 1;
 		}
 	}

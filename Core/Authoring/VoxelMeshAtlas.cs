@@ -37,22 +37,6 @@ namespace Voxels.Core.Authoring
 		[SerializeField]
 		internal NormalsMode normalsMode = NormalsMode.GRADIENT;
 
-		[Header("Surface Fairing Settings")]
-		[SerializeField]
-		[Range(0, 10)]
-		internal int fairingIterations = 5;
-
-		[SerializeField]
-		[Range(0.3f, 0.8f)]
-		internal float fairingStepSize = 0.6f;
-
-		[SerializeField]
-		[Range(0.05f, 0.2f)]
-		internal float cellMargin = 0.1f;
-
-		[SerializeField]
-		internal bool recomputeNormalsAfterFairing;
-
 		[Header("Materials")]
 		[SerializeField]
 		internal MaterialEncoding materialEncoding = MaterialEncoding.COLOR_SPLAT_4;

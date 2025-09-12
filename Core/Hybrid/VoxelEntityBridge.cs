@@ -157,10 +157,6 @@ namespace Voxels.Core.Hybrid
 				{
 					algorithm = vm.meshingAlgorithm,
 					normalsMode = vm.normalsMode,
-					fairingIterations = vm.fairingIterations,
-					fairingStepSize = vm.fairingStepSize,
-					cellMargin = vm.cellMargin,
-					recomputeNormalsAfterFairing = vm.recomputeNormalsAfterFairing,
 					materialEncoding = vm.materialEncoding,
 				}
 			);
@@ -268,10 +264,6 @@ namespace Voxels.Core.Hybrid
 				{
 					algorithm = vm.meshingAlgorithm,
 					normalsMode = vm.normalsMode,
-					fairingIterations = vm.fairingIterations,
-					fairingStepSize = vm.fairingStepSize,
-					cellMargin = vm.cellMargin,
-					recomputeNormalsAfterFairing = vm.recomputeNormalsAfterFairing,
 					materialEncoding = vm.materialEncoding,
 				}
 			);

@@ -44,7 +44,7 @@ namespace Voxels.Core.Meshing.Scheduling
 
 		void AllocateRequestedMeshes(ref SystemState state, ref EntityCommandBuffer ecb)
 		{
-			var toProcess = VoxelBudgets.Current.perFrame.memoryAllocated;
+			var toProcess = MeshingBudgets.Current.perFrame.memoryAllocated;
 
 			foreach (
 				var (req, entity) in Query<RefRO<NativeVoxelMesh.Request>>()

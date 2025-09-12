@@ -3,7 +3,6 @@ namespace Voxels.Core.Meshing.Scheduling
 	using System;
 	using Algorithms;
 	using Algorithms.SurfaceNets;
-	using Components;
 	using Unity.Jobs;
 
 	public static class MeshingScheduling
@@ -12,7 +11,6 @@ namespace Voxels.Core.Meshing.Scheduling
 			in MeshingInputData input,
 			in MeshingOutputData output,
 			in VoxelMeshingAlgorithmComponent algorithm,
-			ref FairingBuffers fairing,
 			JobHandle deps = default
 		)
 		{
@@ -23,17 +21,6 @@ namespace Voxels.Core.Meshing.Scheduling
 					output,
 					deps
 				),
-				VoxelMeshingAlgorithm.FAIRED_SURFACE_NETS => new NaiveSurfaceNetsFairingScheduler
-				{
-					cellMargin = algorithm.cellMargin,
-					fairingBuffers = fairing,
-					fairingStepSize = algorithm.fairingStepSize,
-					fairingIterations = algorithm.fairingIterations,
-					recomputeNormalsAfterFairing = algorithm.recomputeNormalsAfterFairing,
-					seamConstraintMode = algorithm.seamConstraintMode,
-					seamConstraintWeight = algorithm.seamConstraintWeight,
-					seamBandWidth = algorithm.seamBandWidth,
-				}.Schedule(input, output, deps),
 				_ => throw new NotImplementedException($"Algorithm {algorithm.algorithm} not implemented"),
 			};
 		}

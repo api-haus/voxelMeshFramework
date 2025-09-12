@@ -20,7 +20,7 @@ namespace Voxels.Core.Procedural.Generators
 		[Header("Geoid Base Shape")]
 		[Tooltip("Base radius for the geoid in world units. Scales both sphere and star components.")]
 		[SerializeField]
-		[Range(2f, 150f)]
+		[Range(2f, 1000f)]
 		float radius = 20f;
 
 		[Tooltip("World-space center of the geoid (origin for sphere and star prism).")]
@@ -117,7 +117,7 @@ namespace Voxels.Core.Procedural.Generators
 			"Core radius measured from the world-space center; gradient spans from surface radius down to this radius."
 		)]
 		[SerializeField]
-		[Range(0f, 64f)]
+		[Range(0f, 500f)]
 		float coreRadius = 1f;
 
 		[Tooltip("Min multiplier for noise modulation of core blend factor t.")]
@@ -132,8 +132,8 @@ namespace Voxels.Core.Procedural.Generators
 
 		[Tooltip("Amount of stars to draw.")]
 		[SerializeField]
-		[Range(0, 5)]
-		int numStars = 1;
+		[Range(0, 12)]
+		int numStars = 6;
 
 		[Tooltip("Amount of stars to draw.")]
 		[SerializeField]
