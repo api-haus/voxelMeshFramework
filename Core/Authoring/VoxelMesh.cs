@@ -1,7 +1,6 @@
 namespace Voxels.Core.Authoring
 {
-	using Meshing.Algorithms;
-	using Procedural;
+	using Hybrid;
 	using Unity.Mathematics;
 	using UnityEngine;
 	using static Hybrid.VoxelEntityBridge;
@@ -11,31 +10,13 @@ namespace Voxels.Core.Authoring
 	public sealed class VoxelMesh : MonoBehaviour
 	{
 		[SerializeField]
-		internal bool transformAttachment;
-
-		[SerializeField]
-		[Min(0.1f)]
-		internal float voxelSize = 1f;
-
-		[SerializeField]
-		internal ProceduralVoxelGeneratorBehaviour procedural;
-
-		[Header("Meshing Algorithm")]
-		[SerializeField]
-		internal VoxelMeshingAlgorithm meshingAlgorithm = VoxelMeshingAlgorithm.NAIVE_SURFACE_NETS;
-
-		[SerializeField]
-		internal NormalsMode normalsMode = NormalsMode.GRADIENT;
-
-		[Header("Materials")]
-		[SerializeField]
-		internal MaterialEncoding materialEncoding = MaterialEncoding.COLOR_SPLAT_4;
+		internal VoxelMeshingConfig config;
 
 		void Awake()
 		{
 			this.CreateVoxelMeshEntity(
 				gameObject.GetInstanceID(),
-				transformAttachment ? transform : null
+				config.transformAttachment ? transform : null
 			);
 		}
 
@@ -58,7 +39,7 @@ namespace Voxels.Core.Authoring
 			Gizmos.color = Color.blue;
 			Gizmos.DrawWireCube(b.center, b.size);
 
-			float3 size = voxelSize * CHUNK_SIZE;
+			float3 size = config.voxelSize * CHUNK_SIZE;
 
 			Gizmos.color = Color.white;
 			Gizmos.DrawWireCube(size * .5f, size);

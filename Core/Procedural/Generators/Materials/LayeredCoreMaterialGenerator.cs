@@ -1,4 +1,4 @@
-namespace Voxels.Core.Procedural.Generators
+namespace Voxels.Core.Procedural.Generators.Materials
 {
 	using System;
 	using Spatial;
@@ -7,15 +7,12 @@ namespace Voxels.Core.Procedural.Generators
 	using Unity.Mathematics;
 	using Unity.Mathematics.Geometry;
 	using UnityEngine;
-	using static sdf;
-	using static Unity.Mathematics.float4x4;
 	using static Unity.Mathematics.math;
 	using static Unity.Mathematics.noise;
 	using static VoxelConstants;
-	using quaternion = Unity.Mathematics.quaternion;
 
 	[Serializable]
-	public sealed class LayeredGeoidGenerator : ProceduralVoxelGeneratorBehaviour
+	public sealed class LayeredCoreMaterialGenerator : ProceduralMaterialGeneratorBehaviour
 	{
 		[Header("Geoid Base Shape")]
 		[Tooltip("Base radius for the geoid in world units. Scales both sphere and star components.")]
@@ -26,11 +23,6 @@ namespace Voxels.Core.Procedural.Generators
 		[Tooltip("World-space center of the geoid (origin for sphere and star prism).")]
 		[SerializeField]
 		Vector3 center = Vector3.zero;
-
-		[Header("Noise (optional)")]
-		[Tooltip("Random seed for any procedural noise used by this generator (currently not used).")]
-		[SerializeField]
-		uint seed = 1;
 
 		[Tooltip("Noise frequency scale (1/frequency). Reserved for noise-based features.")]
 		[SerializeField]
@@ -80,30 +72,6 @@ namespace Voxels.Core.Procedural.Generators
 		[Range(1, 64)]
 		int sdfSamplesPerVoxel = 16;
 
-		[Header("Star Prism Shape")]
-		[Tooltip(
-			"Half-height of the 5-pointed star prism in world units (radius * value). Controls thickness."
-		)]
-		[SerializeField]
-		[Range(0.01f, 8f)]
-		float starRadiusHalfHeight = 1.1f;
-
-		[Tooltip("Inner radius factor of the star (0..1). Lower values produce sharper points.")]
-		[SerializeField]
-		[Range(0.01f, 1f)]
-		float starRadiusFactor = 1f;
-
-		[Tooltip("Multiplier for the star radius. 1 = original radius.")]
-		[SerializeField]
-		[Range(0.01f, 10f)]
-		float starRadiusMultiplier = 1f;
-
-		[Header("Sphere Shape")]
-		[Tooltip("Sphere radius as a factor of base radius (0..1). Blended (union) with star prism.")]
-		[SerializeField]
-		[Range(0.01f, 1f)]
-		float sphereRadiusFactor = .7f;
-
 		[Header("Inside Gradient (Surface→Core)")]
 		[Tooltip("Material at the interior surface boundary (start of gradient).")]
 		[SerializeField]
@@ -130,21 +98,7 @@ namespace Voxels.Core.Procedural.Generators
 		[Range(0f, 2f)]
 		float materialBlendNoiseMax = 1.25f;
 
-		[Tooltip("Amount of stars to draw.")]
-		[SerializeField]
-		[Range(0, 12)]
-		int numStars = 6;
-
-		[Tooltip("Amount of stars to draw.")]
-		[SerializeField]
-		[Range(0, 90)]
-		float starRotationDegrees = 16;
-
-		[Tooltip("Star rotation axis.")]
-		[SerializeField]
-		float3 starAxis = up();
-
-		public override JobHandle Schedule(
+		public override JobHandle ScheduleMaterials(
 			MinMaxAABB localBounds,
 			float4x4 ltw,
 			float voxelSize,
@@ -154,27 +108,7 @@ namespace Voxels.Core.Procedural.Generators
 		{
 			// Linear quantization scale to pack more resolution per voxel into sbyte
 			var sdfScale = sdfSamplesPerVoxel / voxelSize;
-			// 1) Generate hemisphere SDF (inside-positive). Hemisphere is sphere intersected with half-space y >= center.y (Y+ oriented)
-			inputDeps = new SdfJob
-			{
-				ltw = ltw,
-				bounds = localBounds,
-				voxelSize = voxelSize,
-				volumeData = data,
-				noiseFrequency = rcp(noiseFrequency),
-				centerWorld = center,
-				radius = radius,
-				sdfScale = sdfScale,
-				starRadiusHalfHeight = starRadiusHalfHeight,
-				starRadiusFactor = starRadiusFactor,
-				sphereRadiusFactor = sphereRadiusFactor,
-				starRadiusMultiplier = starRadiusMultiplier,
-				numStars = numStars,
-				starRotationDegrees = starRotationDegrees,
-				starAxis = normalize(starAxis),
-			}.Schedule(VOLUME_LENGTH, inputDeps);
 
-			// 2) Paint materials similar to SimpleNoiseVoxelGenerator
 			inputDeps = new MaterialPaintJob
 			{
 				ltw = ltw,
@@ -183,10 +117,7 @@ namespace Voxels.Core.Procedural.Generators
 				volumeData = data,
 				centerWorld = center,
 				radius = radius,
-				seed = seed,
 				noiseFrequency = rcp(noiseFrequency),
-				materialGround = materialGround,
-				materialGold = materialGold,
 				materialGrass = materialGrass,
 				grassUpDotThreshold = grassUpDotThreshold,
 				grassUpDotRange = grassUpDotRange,
@@ -204,67 +135,6 @@ namespace Voxels.Core.Procedural.Generators
 		}
 
 		[BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
-		struct SdfJob : IJobFor
-		{
-			public float voxelSize;
-			public MinMaxAABB bounds;
-			public VoxelVolumeData volumeData;
-
-			public float4x4 ltw;
-			public float3 centerWorld;
-			public float radius;
-			public float sdfScale;
-			public float noiseFrequency;
-			public float starRadiusHalfHeight;
-			public float starRadiusFactor;
-			public float sphereRadiusFactor;
-			public float starRadiusMultiplier;
-			public int numStars;
-			public float starRotationDegrees;
-			public float3 starAxis;
-
-			public void Execute(int index)
-			{
-				// Reverse of linear index mapping: index = (x << X_SHIFT) + (y << Y_SHIFT) + z
-				var x = (index >> X_SHIFT) & CHUNK_SIZE_MINUS_ONE;
-				var y = (index >> Y_SHIFT) & CHUNK_SIZE_MINUS_ONE;
-				var z = index & CHUNK_SIZE_MINUS_ONE;
-
-				float3 localCoord = int3(x, y, z);
-				var coord = bounds.Min + (localCoord * voxelSize);
-
-				coord = transform(ltw, coord);
-
-				var toCenter = coord - centerWorld;
-				var sSphere = sdSphere(toCenter, radius * sphereRadiusFactor);
-				// var modSphere = (radius * smoothSphereMult) - d;
-				// var sNoise = snoise(toCenter * noiseFrequency); // inside-positive half-space (y <= center.y)
-				// var sSphereNoiseUnion = opSmoothUnion(modSphere, -sNoise, radius * unionSmoothK);
-				// var sSphereUnion = opUnion(opSubtraction(-sSphereNoiseUnion, sSphere), sSphere);
-
-				var sStarSphereUnion = sSphere;
-
-				for (var i = 0; i < numStars; i++)
-				{
-					var sStar = sdStar5Prism(
-						// toCenter,
-						opTx(
-							TRS(0, quaternion.AxisAngle(starAxis, radians(i * starRotationDegrees)), 1),
-							toCenter
-						),
-						radius * starRadiusMultiplier,
-						starRadiusFactor,
-						radius * starRadiusHalfHeight
-					);
-					sStarSphereUnion = opUnion(sStar, sStarSphereUnion);
-				}
-
-				var sdfByte = clamp(sStarSphereUnion * sdfScale, -127f, 127f);
-				volumeData.sdfVolume[index] = (sbyte)sdfByte;
-			}
-		}
-
-		[BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
 		struct MaterialPaintJob : IJobFor
 		{
 			public float voxelSize;
@@ -274,10 +144,7 @@ namespace Voxels.Core.Procedural.Generators
 			public float4x4 ltw;
 			public float3 centerWorld;
 			public float radius;
-			public uint seed;
 			public float noiseFrequency;
-			public byte materialGround;
-			public byte materialGold;
 			public byte materialGrass;
 			public float grassUpDotThreshold;
 			public float sdfScale;
@@ -308,10 +175,6 @@ namespace Voxels.Core.Procedural.Generators
 				// Surface normal approximation for hemisphere vs cap plane
 				var toCenter = coord - centerWorld;
 				var d = max(1e-6f, length(toCenter));
-				var sSphere = radius - d;
-				var sPlane = centerWorld.y - coord.y;
-				var sphereSurface = sSphere <= sPlane;
-				var normal = sphereSurface ? toCenter / d : new float3(0f, 1f, 0f);
 
 				// Outside (air): pad one-voxel shell with material to support blending
 				if (sNegInside > 0f)

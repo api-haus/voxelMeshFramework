@@ -1,7 +1,6 @@
 namespace Voxels.Core.Authoring
 {
-	using Meshing.Algorithms;
-	using Procedural;
+	using Hybrid;
 	using Unity.Mathematics;
 	using UnityEngine;
 	using static Hybrid.VoxelEntityBridge;
@@ -12,38 +11,20 @@ namespace Voxels.Core.Authoring
 	{
 		[Header("Grid Params")]
 		[SerializeField]
-		internal bool transformAttachment;
-
-		[SerializeField]
-		internal bool stampEditable = true;
+		internal Bounds gridBounds;
 
 		[SerializeField]
 		internal GameObject chunkPrefab;
 
 		[SerializeField]
-		[Min(0.1f)]
-		internal float voxelSize = 1f;
-
-		[SerializeField]
-		internal Bounds gridBounds;
-
-		[SerializeField]
-		internal ProceduralVoxelGeneratorBehaviour proceduralGenerator;
-
-		[Header("Meshing Algorithm")]
-		[SerializeField]
-		internal VoxelMeshingAlgorithm meshingAlgorithm = VoxelMeshingAlgorithm.NAIVE_SURFACE_NETS;
-
-		[SerializeField]
-		internal NormalsMode normalsMode = NormalsMode.GRADIENT;
-
-		[Header("Materials")]
-		[SerializeField]
-		internal MaterialEncoding materialEncoding = MaterialEncoding.COLOR_SPLAT_4;
+		internal VoxelMeshingConfig config;
 
 		void OnEnable()
 		{
-			this.CreateAtlasEntity(gameObject.GetInstanceID(), transformAttachment ? transform : null);
+			this.CreateAtlasEntity(
+				gameObject.GetInstanceID(),
+				config.transformAttachment ? transform : null
+			);
 		}
 
 		void OnDisable()
@@ -65,7 +46,7 @@ namespace Voxels.Core.Authoring
 
 			float3 volumeSize = gridBounds.size;
 
-			var chunkSize = voxelSize * EFFECTIVE_CHUNK_SIZE;
+			var chunkSize = config.voxelSize * EFFECTIVE_CHUNK_SIZE;
 			var gridDims = (int3)ceil(volumeSize / chunkSize);
 
 			// Clamp to at least 1 in each axis to avoid zero-chunk grids when bounds are degenerate

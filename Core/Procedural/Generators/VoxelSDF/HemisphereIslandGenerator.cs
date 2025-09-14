@@ -1,4 +1,4 @@
-namespace Voxels.Core.Procedural.Generators
+namespace Voxels.Core.Procedural.Generators.VoxelSDF
 {
 	using Spatial;
 	using Unity.Burst;
@@ -14,7 +14,7 @@ namespace Voxels.Core.Procedural.Generators
 		public float planeY;
 		public int sdfSamplesPerVoxel;
 
-		public JobHandle Schedule(
+		public JobHandle ScheduleVoxels(
 			MinMaxAABB localBounds,
 			float4x4 transform,
 			float voxelSize,
@@ -33,16 +33,6 @@ namespace Voxels.Core.Procedural.Generators
 				radius = radius,
 				planeY = planeY,
 				sdfScale = sdfScale,
-			}.Schedule(VOLUME_LENGTH, inputDeps);
-
-			inputDeps = new MaterialJob
-			{
-				ltw = transform,
-				bounds = localBounds,
-				voxelSize = voxelSize,
-				volumeData = data,
-				sdfScale = sdfScale,
-				material = 1,
 			}.Schedule(VOLUME_LENGTH, inputDeps);
 
 			return inputDeps;
@@ -124,23 +114,6 @@ namespace Voxels.Core.Procedural.Generators
 
 				var sdfByte = clamp(sUnion * sdfScale, -127f, 127f);
 				volumeData.sdfVolume[index] = (sbyte)sdfByte;
-			}
-		}
-
-		[BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
-		struct MaterialJob : IJobFor
-		{
-			public float voxelSize;
-			public MinMaxAABB bounds;
-			public VoxelVolumeData volumeData;
-			public float4x4 ltw;
-			public float sdfScale;
-			public byte material;
-
-			public void Execute(int index)
-			{
-				var sWorld = volumeData.sdfVolume[index] / sdfScale;
-				volumeData.materials[index] = sWorld >= 0f ? material : MATERIAL_AIR;
 			}
 		}
 	}

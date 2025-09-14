@@ -4,13 +4,12 @@ namespace Voxels.Core.Procedural
 	using Unity.Jobs;
 	using Unity.Mathematics;
 	using Unity.Mathematics.Geometry;
-	using UnityEngine;
 
-	public abstract class ProceduralVoxelGeneratorBehaviour : MonoBehaviour, IProceduralVoxelGenerator
+	public interface IProceduralMaterialGenerator
 	{
-		public abstract JobHandle ScheduleVoxels(
+		JobHandle ScheduleMaterials(
 			MinMaxAABB localBounds,
-			float4x4 ltw,
+			float4x4 transform,
 			float voxelSize,
 			VoxelVolumeData data,
 			JobHandle inputDeps

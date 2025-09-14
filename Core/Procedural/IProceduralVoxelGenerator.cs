@@ -1,4 +1,4 @@
-namespace Voxels.Core.Procedural.Generators
+namespace Voxels.Core.Procedural
 {
 	using Spatial;
 	using Unity.Jobs;
@@ -7,7 +7,7 @@ namespace Voxels.Core.Procedural.Generators
 
 	public interface IProceduralVoxelGenerator
 	{
-		JobHandle Schedule(
+		JobHandle ScheduleVoxels(
 			MinMaxAABB localBounds,
 			float4x4 transform,
 			float voxelSize,

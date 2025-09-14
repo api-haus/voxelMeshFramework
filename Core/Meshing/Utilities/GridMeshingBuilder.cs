@@ -5,7 +5,7 @@ namespace Voxels.Core.Meshing.Utilities
 	using Algorithms;
 	using Components;
 	using Managed;
-	using Procedural.Generators;
+	using Procedural;
 	using Stamps;
 	using Unity.Collections;
 	using Unity.Jobs;
@@ -49,7 +49,7 @@ namespace Voxels.Core.Meshing.Utilities
 					);
 
 					var ltw = float4x4.identity;
-					var handle = generator.Schedule(bounds, ltw, voxelSize, nvm.volume, default);
+					var handle = generator.ScheduleVoxels(bounds, ltw, voxelSize, nvm.volume, default);
 					handle.Complete();
 
 					chunks.Add(nvm);

@@ -44,15 +44,26 @@ namespace Voxels.Core.Procedural.Scheduling
 
 				using (ProceduralVoxelGenerationSystem_Schedule.Auto())
 				{
-					var job = pcg.generator.Schedule(
+					var jobHandle = GetFence(entity);
+
+					jobHandle = pcg.voxels.ScheduleVoxels(
 						voxelObject.localBounds,
 						ltw.Value,
 						voxelObject.voxelSize,
 						mesh.volume,
-						GetFence(entity)
+						jobHandle
 					);
 
-					UpdateFence(entity, job);
+					if (pcg.materials != null)
+						jobHandle = pcg.materials.ScheduleMaterials(
+							voxelObject.localBounds,
+							ltw.Value,
+							voxelObject.voxelSize,
+							mesh.volume,
+							jobHandle
+						);
+
+					UpdateFence(entity, jobHandle);
 				}
 
 				ecb.SetComponentEnabled<NeedsProceduralUpdate>(entity, false);
