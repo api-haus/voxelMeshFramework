@@ -34,6 +34,9 @@ namespace Voxels.Core.Stamps
 		[Range(-1, 1)]
 		public float strength;
 
+		[Range(1, 8)]
+		public float shapePower;
+
 		public byte material;
 	}
 }

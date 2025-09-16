@@ -35,6 +35,8 @@ namespace Voxels.Core.Meshing.Algorithms
 		/// </summary>
 		public float voxelSize;
 
+		public float positionJitter;
+
 		/// <summary>
 		///   Size of the chunk (must be 32 for SIMD optimizations).
 		/// </summary>

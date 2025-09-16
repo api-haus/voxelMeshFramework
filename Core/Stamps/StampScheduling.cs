@@ -17,7 +17,7 @@ namespace Voxels.Core.Stamps
 			JobHandle inputDeps = default
 		)
 		{
-			var job = new ApplyVoxelStampJob
+			var job = new ApplyStampSphereShapeJob
 			{
 				stamp = stamp,
 				volumeSdf = nvm.volume.sdfVolume,

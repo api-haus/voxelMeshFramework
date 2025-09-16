@@ -7,9 +7,25 @@ namespace Voxels.Core.Hybrid
 	using Unity.Entities;
 	using Unity.Logging;
 	using static Diagnostics.VoxelProfiler.Marks;
+	using Entity = Unity.Entities.Entity;
 
 	public static class VoxelEntityBridge
 	{
+		public static T GetSingleton<T>()
+			where T : unmanaged, IComponentData
+		{
+			if (!TryGetEntityManager(out var em))
+				return default;
+			var mapQuery = em.CreateEntityQuery(ComponentType.ReadOnly<T>());
+			if (!mapQuery.IsEmptyIgnoreFilter)
+			{
+				var st = mapQuery.GetSingleton<T>();
+				return st;
+			}
+
+			return default;
+		}
+
 		public static bool TryGetEntity(int gameObjectInstanceID, out Entity entity)
 		{
 			entity = Entity.Null;

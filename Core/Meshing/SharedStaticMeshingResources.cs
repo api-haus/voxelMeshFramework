@@ -29,8 +29,40 @@ namespace Voxels.Core.Meshing
 				FillEdgeTable();
 			}
 
+			var desired = Vertex.VertexFormat;
 			if (!VertexAttributes.IsCreated)
-				VertexAttributes = new(Vertex.VertexFormat, Allocator.Persistent);
+			{
+				VertexAttributes = new(desired, Allocator.Persistent);
+			}
+			else
+			{
+				var recreate = VertexAttributes.Length != desired.Length;
+				if (!recreate)
+				{
+					for (var i = 0; i < desired.Length; i++)
+					{
+						var a = VertexAttributes[i];
+						var b = desired[i];
+						if (
+							a.attribute != b.attribute
+							|| a.format != b.format
+							|| a.dimension != b.dimension
+							|| a.stream != b.stream
+						)
+						{
+							recreate = true;
+							break;
+						}
+					}
+				}
+
+				if (recreate)
+				{
+					if (VertexAttributes.IsCreated)
+						VertexAttributes.Dispose();
+					VertexAttributes = new(desired, Allocator.Persistent);
+				}
+			}
 
 			// Application.quitting += Release;
 		}

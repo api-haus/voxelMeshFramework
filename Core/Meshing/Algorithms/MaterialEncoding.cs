@@ -15,7 +15,7 @@ namespace Voxels.Core.Meshing.Algorithms
 		///   Encode up to 4 material weights using corner-sum of the 8 cube corners (counts per material), normalized.
 		/// </summary>
 		[InspectorName("Encode material value in R channel R=0..255")]
-		COLOR_DIRECT = 1,
+		COLOR_VALUE_R = 1,
 
 		/// <summary>
 		///   Palette color encoding from up to 256 material colors.
@@ -27,6 +27,24 @@ namespace Voxels.Core.Meshing.Algorithms
 		///   Encode up to 4 material weights using corner-sum of the 8 cube corners (counts per material), normalized.
 		/// </summary>
 		[InspectorName("Splat-like color encoding for up to 4 materials")]
-		COLOR_SPLAT_4 = 3,
+		COLOR_SPLAT_4 = 4,
+
+		/// <summary>
+		///   Encode up to 4 material weights using corner-sum of the 8 cube corners (counts per material), normalized.
+		/// </summary>
+		[InspectorName("Splat-like color encoding for up to 8 materials")]
+		COLOR_SPLAT_8 = 8,
+
+		/// <summary>
+		///   Encode up to 4 material weights using corner-sum of the 8 cube corners (counts per material), normalized.
+		/// </summary>
+		[InspectorName("Splat-like color encoding for up to 12 materials")]
+		COLOR_SPLAT_12 = 12,
+
+		/// <summary>
+		///   Encode up to 4 material weights using corner-sum of the 8 cube corners (counts per material), normalized.
+		/// </summary>
+		[InspectorName("Splat-like color encoding for up to 16 materials")]
+		COLOR_SPLAT_16 = 16,
 	}
 }

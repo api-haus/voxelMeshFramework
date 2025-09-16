@@ -11,9 +11,8 @@ namespace Voxels.Core.Stamps
 	using static Unity.Mathematics.math;
 	using static VoxelConstants;
 
-	//sphere only
 	[BurstCompile(FloatPrecision.Low, FloatMode.Fast)]
-	public struct ApplyVoxelStampJob : IJob
+	public struct ApplyStampSphereShapeJob : IJob
 	{
 		[NativeDisableContainerSafetyRestriction]
 		public NativeArray<sbyte> volumeSdf;
@@ -92,6 +91,8 @@ namespace Voxels.Core.Stamps
 
 				// Sphere SDF in world units (inside-positive)
 				var sSphereWorld = (radiusVoxel - d) * voxelSize;
+
+				sSphereWorld = pow(sSphereWorld, stamp.shapePower);
 
 				// Target by boolean SDF op in inside-positive convention
 				var isPlace = stamp.strength >= 0f;

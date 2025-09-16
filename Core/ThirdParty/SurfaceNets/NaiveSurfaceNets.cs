@@ -21,6 +21,7 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 	using static Unity.Mathematics.math;
 	using static VoxelConstants;
 	using float3 = Unity.Mathematics.float3;
+	using float4 = Unity.Mathematics.float4;
 	using v128 = Unity.Burst.Intrinsics.v128;
 
 	/// <summary>
@@ -116,6 +117,7 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 		public NormalsMode normalsMode;
 
 		public float voxelSize;
+		public float positionJitter;
 
 		/// <summary>
 		///   Main execution entry point for the surface meshing algorithm.
@@ -612,7 +614,8 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 			// This creates smooth surfaces by positioning vertices at the weighted average
 			// of all edge crossing points, rather than at cube centers.
 			var vertexOffset = GetVertexPositionFromSamples(samples, edgeMask);
-			var position = (new float3(pos[0], pos[1], pos[2]) + vertexOffset) * voxelSize;
+			var position =
+				((new float3(pos[0], pos[1], pos[2]) + vertexOffset) * voxelSize) + positionJitter;
 
 			// ===== MATERIAL ASSIGNMENT =====
 			// Discrete mode is deprecated; choose between blended modes.
@@ -648,8 +651,12 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 						normalsMode == NormalsMode.GRADIENT
 							? GetVertexNormalFromSamples(samples, voxelSize)
 							: float3.zero,
-					// Encode materials per configuration
-					color = materialColor,
+					// Initialize extended material channels to zero; encoding pass fills them
+					color = new float4(0f, 0f, 0f, 0f),
+					splatControl0 = new float4(0f, 0f, 0f, 0f),
+					splatControl1 = new float4(0f, 0f, 0f, 0f),
+					splatControl2 = new float4(0f, 0f, 0f, 0f),
+					splatControl3 = new float4(0f, 0f, 0f, 0f),
 				}
 			);
 
@@ -1076,24 +1083,6 @@ namespace Voxels.Core.ThirdParty.SurfaceNets
 				(byte)(materialWeights[3] * 255f)
 			);
 		}
-
-		// SIMD-friendly variants that take 8 corner materials directly (already interleaved)
-		//		[SkipLocalsInit]
-		//		static Color32 GetVertexMaterialWeights_Interleaved(
-		//			byte m0,
-		//			byte m1,
-		//			byte m2,
-		//			byte m3,
-		//			byte m4,
-		//			byte m5,
-		//			byte m6,
-		//			byte m7,
-		//			float3 vertexOffset
-		//		)
-		//		{
-		//			// Removed: favor Corner-Sum mode as the single supported fast path
-		//			return new Color32(0, 0, 0, 255);
-		//		}
 
 		[SkipLocalsInit]
 		static Color32 GetVertexMaterialWeightsCornerSum_Interleaved(

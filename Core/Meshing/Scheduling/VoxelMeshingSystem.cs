@@ -12,6 +12,7 @@ namespace Voxels.Core.Meshing.Scheduling
 	using static Concurrency.VoxelJobFenceRegistry;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
+	using static Unity.Mathematics.math;
 	using static VoxelConstants;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 	using Entity = Unity.Entities.Entity;
@@ -94,6 +95,7 @@ namespace Voxels.Core.Meshing.Scheduling
 				chunkSize = CHUNK_SIZE,
 				normalsMode = algorithm.normalsMode,
 				materialEncoding = algorithm.materialEncoding,
+				positionJitter = rcp(100_000 + (entity.Index % 1000)),
 			};
 
 			var output = new MeshingOutputData
