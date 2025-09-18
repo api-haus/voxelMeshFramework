@@ -12,12 +12,12 @@ namespace Voxels.Core.Meshing.Scheduling
 	using static Concurrency.VoxelJobFenceRegistry;
 	using static Diagnostics.VoxelProfiler.Marks;
 	using static Unity.Entities.SystemAPI;
-	using static Unity.Mathematics.math;
 	using static VoxelConstants;
 	using EndSimST = Unity.Entities.EndSimulationEntityCommandBufferSystem.Singleton;
 	using Entity = Unity.Entities.Entity;
 	using EntityCommandBuffer = Unity.Entities.EntityCommandBuffer;
 	using ISystem = Unity.Entities.ISystem;
+	using Random = Unity.Mathematics.Random;
 	using SystemState = Unity.Entities.SystemState;
 
 	[RequireMatchingQueriesForUpdate]
@@ -95,7 +95,7 @@ namespace Voxels.Core.Meshing.Scheduling
 				chunkSize = CHUNK_SIZE,
 				normalsMode = algorithm.normalsMode,
 				materialEncoding = algorithm.materialEncoding,
-				positionJitter = rcp(100_000 + (entity.Index % 1000)),
+				positionJitter = Random.CreateFromIndex((uint)entity.Index).NextFloat(0f, 0.0005f),
 			};
 
 			var output = new MeshingOutputData
